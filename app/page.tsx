@@ -2,22 +2,20 @@
 
 import { useEffect, useState } from "react";
 import ExperienceFlow, { type NewExperience } from "./ExperienceFlow";
-import OnboardingFlow from "./OnboardingFlow";
 import ExperienceLibrary from "./ExperienceLibrary";
 import JobAnalysis from "./JobAnalysis";
 import ResumeBuilder from "./ResumeBuilder";
 import AudienceGate from "./AudienceGate";
 import EnterprisePortal from "./EnterprisePortal";
-import PublicProfile from "./PublicProfile";
 import ProductGuide from "./ProductGuide";
+import ProfileEditModal, { type TalentProfile } from "./ProfileEditModal";
 import { readEvidence, writeEvidence } from "./ExperienceEvidence";
 
 const navItems = [
-  { label: "首頁", icon: "⌂", active: true },
-  { label: "我的經驗", icon: "◇" },
-  { label: "履歷", icon: "▤" },
-  { label: "職缺探索", icon: "◎" },
-  { label: "公開 Profile", icon: "◉" },
+  { label: "首頁" },
+  { label: "我的經驗" },
+  { label: "我的履歷" },
+  { label: "職缺探索" },
 ];
 
 const skillGroups = {
@@ -98,8 +96,13 @@ export default function Home() {
   const [period, setPeriod] = useState("近 12 個月");
   const [experiences, setExperiences] = useState(initialExperiences);
   const [showExperienceFlow, setShowExperienceFlow] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [profile, setProfile] = useState<TalentProfile>({
+    name: "宋宇倫",
+    bio: "喜歡把模糊問題拆成可以研究與驗證的方向，具備使用者研究、產品企劃與資料分析經驗。",
+    avatar: "",
+  });
   const [activeView, setActiveView] = useState("首頁");
   const [resumeTarget, setResumeTarget] = useState<string | undefined>();
   const [skillGroup, setSkillGroup] = useState<keyof typeof skillGroups>("核心能力");
@@ -158,7 +161,7 @@ export default function Home() {
       window.setTimeout(() => document.getElementById("home-career-analysis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
       return;
     }
-    if (["首頁", "我的經驗", "履歷", "職缺探索", "公開 Profile"].includes(label)) {
+    if (["首頁", "我的經驗", "我的履歷", "職缺探索"].includes(label)) {
       setActiveView(label);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -172,26 +175,26 @@ export default function Home() {
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">G</span><span>GoodJob</span></div>
+        <div className="brand">
+          <span className="brand-mark">G</span>
+          <span>GoodJob</span>
+          <button className="brand-guide-button" onClick={() => setShowGuide(true)} aria-label="產品導覽">i</button>
+        </div>
 
         <nav className="primary-nav" aria-label="主要導覽">
           {navItems.map((item) => (
             <button className={`nav-item ${activeView === item.label ? "active" : ""}`} key={item.label} onClick={() => handleNavigation(item.label)}>
-              <span className="nav-icon">{item.icon}</span>{item.label}
-              {item.label === "我的經驗" && <span className="nav-count">{experiences.length}</span>}
+              {item.label}
             </button>
           ))}
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="prototype-badge" onClick={() => setShowGuide(true)}><span>✦</span><span><strong>Prototype 展示版</strong><small>了解功能與資料限制</small></span></button>
           <button className="nav-item role-switch-button" onClick={() => setAudience(null)}><span className="nav-icon">⇄</span>切換展示身分</button>
-          <button className="nav-item" onClick={() => setShowOnboarding(true)}><span className="nav-icon">⚙</span>個人設定</button>
-          <div className="profile-mini">
-            <span className="avatar">倫</span>
-            <span><strong>宋宇倫</strong><small>產品探索者</small></span>
-            <button aria-label="重新體驗初始設定" title="重新體驗初始設定" onClick={() => setShowOnboarding(true)}>···</button>
-          </div>
+          <button className="profile-mini profile-mini-trigger" onClick={() => setShowProfileEditor(true)} aria-label="編輯個人資料">
+            <span className={profile.avatar ? "avatar has-image" : "avatar"} style={profile.avatar ? { backgroundImage: `url(${profile.avatar})` } : undefined}>{!profile.avatar && (profile.name.slice(-1) || "人")}</span>
+            <span><strong>{profile.name}</strong></span>
+          </button>
         </div>
       </aside>
 
@@ -199,10 +202,9 @@ export default function Home() {
         <header className="topbar">
           <div className="mobile-brand"><span className="brand-mark">G</span><strong>GoodJob</strong></div>
           <label className="search-box">
-            <span>⌕</span><input aria-label="搜尋經驗與技能" placeholder="搜尋經驗、技能或職缺" /><kbd>⌘ K</kbd>
+            <span>⌕</span><input aria-label="搜尋經驗與技能" placeholder="搜尋經驗、技能或職缺" />
           </label>
           <div className="top-actions">
-            <button className="tour-button" onClick={() => setShowGuide(true)}>？ 產品導覽</button>
             <button className="icon-button" aria-label="通知">○<span className="notification-dot" /></button>
             <button className="add-button" onClick={() => setShowExperienceFlow(true)}>＋ 新增經驗</button>
           </div>
@@ -213,7 +215,7 @@ export default function Home() {
           <section className="welcome-row">
             <div>
               <p className="eyebrow">THURSDAY, AUGUST 27</p>
-              <h1>早安，宇倫 <span>👋</span></h1>
+              <h1>早安，{profile.name.length >= 3 ? profile.name.slice(-2) : profile.name} <span>👋</span></h1>
               <p>每一段經驗都值得被好好記住。這是你目前的職涯全貌。</p>
             </div>
             <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="選擇資料期間">
@@ -247,7 +249,6 @@ export default function Home() {
                 <div className="progress-ring"><span>72<small>%</small></span></div>
                 <ul><li><span className="done">✓</span>基本資料</li><li><span className="done">✓</span>3 段核心經驗</li><li><span>3</span>項成果待補數據</li></ul>
               </div>
-              <button className="subtle-button" onClick={() => setShowOnboarding(true)}>繼續完善資料</button>
             </article>
           </section>
 
@@ -320,17 +321,16 @@ export default function Home() {
           </section>
           </>}
           {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} />}
-          {activeView === "履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} />}
-          {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); handleNavigation("履歷"); }} />}
-          {activeView === "公開 Profile" && <PublicProfile experiences={experiences} />}
+          {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} />}
+          {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); handleNavigation("我的履歷"); }} />}
         </div>
       </section>
 
       {notice && <div className="toast" role="status"><span>✦</span>{notice}</div>}
       {showExperienceFlow && <ExperienceFlow onClose={() => setShowExperienceFlow(false)} onComplete={completeExperience} />}
-      {showOnboarding && <OnboardingFlow onClose={() => setShowOnboarding(false)} onComplete={() => { setShowOnboarding(false); setNotice("個人設定已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
       {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={handleNavigation} />}
-      <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"履歷",icon:"▤"},{label:"職缺探索",icon:"◎"},{label:"公開 Profile",icon:"◉"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "職缺探索" ? "探索" : item.label === "公開 Profile" ? "公開" : item.label}</button>)}</nav>
+      {showProfileEditor && <ProfileEditModal profile={profile} onClose={() => setShowProfileEditor(false)} onSave={(nextProfile) => { setProfile(nextProfile); setShowProfileEditor(false); setNotice("個人資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
+      <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"我的履歷",icon:"▤"},{label:"職缺探索",icon:"◎"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "我的履歷" ? "履歷" : item.label === "職缺探索" ? "探索" : item.label}</button>)}</nav>
     </main>
   );
 }

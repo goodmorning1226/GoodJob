@@ -8,7 +8,7 @@ const steps = [
   { number:"01", kicker:"CAPTURE", title:"先記錄，不必先會寫履歷。", text:"把實習、專案、競賽或社團經驗用自己的話記下來，GoodJob 會整理摘要、技能與可使用的證據。", view:"我的經驗", action:"看看經驗資料庫" },
   { number:"02", kicker:"UNDERSTAND", title:"看見能力如何隨時間累積。", text:"從所有經驗整理技能證據、經歷分布與成長時間軸，幫助你理解自己適合往哪裡走。", view:"首頁分析", action:"看看首頁分析" },
   { number:"03", kicker:"CONNECT", title:"用證據對照職缺，而不是只看關鍵字。", text:"職缺探索會區分直接符合、可轉移能力與待補缺口，再把結果帶進履歷調整。", view:"職缺探索", action:"看看職缺探索" },
-  { number:"04", kicker:"CREATE", title:"把經驗轉成針對職缺的履歷。", text:"選定目標後，挑選最相關的經驗、調整內容與模板，完成可直接修改的履歷。整套 Prototype 都不會呼叫付費 API。", view:"履歷", action:"開始製作履歷" },
+  { number:"04", kicker:"CREATE", title:"把經驗轉成針對職缺的履歷。", text:"選定目標後，挑選最相關的經驗、調整內容與模板，完成可直接修改的履歷。整套 Prototype 都不會呼叫付費 API。", view:"我的履歷", action:"開始製作履歷" },
 ];
 
 export default function ProductGuide({ onClose, onNavigate }: Props) {
