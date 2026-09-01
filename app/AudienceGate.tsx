@@ -1,6 +1,9 @@
 "use client";
 
-type Props = { onSelect: (audience: "user" | "business") => void };
+type Props = {
+  onSelect: (audience: "user" | "business") => void;
+  onShowGuide: () => void;
+};
 
 function TalentIcon() {
   return (
@@ -20,7 +23,7 @@ function BusinessIcon() {
   );
 }
 
-export default function AudienceGate({ onSelect }: Props) {
+export default function AudienceGate({ onSelect, onShowGuide }: Props) {
   return (
     <main className="audience-gate">
       <div className="audience-gate-orbit orbit-a" />
@@ -29,6 +32,7 @@ export default function AudienceGate({ onSelect }: Props) {
         <header>
           <span className="brand-mark">G</span>
           <strong>GoodJob</strong>
+          <button className="brand-guide-button" onClick={onShowGuide} aria-label="產品導覽"><span aria-hidden="true">?</span></button>
         </header>
         <div className="audience-gate-copy">
           <span className="page-kicker">CHOOSE YOUR VIEW</span>

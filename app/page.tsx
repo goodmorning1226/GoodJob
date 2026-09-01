@@ -26,11 +26,15 @@ const skillGroups = {
   "領域知識": [["數位產品", 86, "4 段經驗", "證據充分"], ["教育科技", 61, "2 段經驗", "有部分證據"], ["校園服務", 78, "3 段經驗", "證據充分"]],
 };
 
-const careerInsights = [
-  { label: "主要優勢", icon: "↗", title: "把研究洞察轉成產品方向", text: "你在 4 段不同經驗中都完成了從問題探索、洞察整理到方案提出的流程，這是目前證據最完整的能力組合。", source: "來自產品實習、商業競賽與 2 個課程專案" },
-  { label: "可轉移能力", icon: "⌁", title: "從簡報溝通延伸到跨部門協作", text: "你多次負責提案與成果呈現。若補充如何協調不同意見，這些經驗可進一步支持跨部門協作能力。", source: "來自競賽提案、社團活動與實習成果發表" },
-  { label: "建議補強", icon: "＋", title: "為資料分析補上決策影響", text: "目前記錄了分析方法，但較少描述分析結果如何影響產品或團隊決策。補充一項前後差異會更有說服力。", source: "檢視 3 段含資料分析的經驗" },
-];
+const experienceTypeTone: Record<string, string> = {
+  "實習": "internship",
+  "工作": "work",
+  "競賽": "competition",
+  "專案": "project",
+  "修課": "course",
+  "社團": "club",
+  "研究": "research",
+};
 
 const initialExperiences: NewExperience[] = [
   {
@@ -80,20 +84,9 @@ const initialExperiences: NewExperience[] = [
   },
 ];
 
-function Sparkline() {
-  return (
-    <div className="sparkline" aria-label="近六個月經驗累積趨勢">
-      {[34, 45, 42, 61, 66, 83, 78, 96].map((height, index) => (
-        <span key={index} style={{ height: `${height}%` }} />
-      ))}
-    </div>
-  );
-}
-
 export default function Home() {
   const [audience, setAudience] = useState<"user" | "business" | null>(null);
   const [notice, setNotice] = useState("");
-  const [period, setPeriod] = useState("近 12 個月");
   const [experiences, setExperiences] = useState(initialExperiences);
   const [showExperienceFlow, setShowExperienceFlow] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -106,9 +99,7 @@ export default function Home() {
   const [activeView, setActiveView] = useState("首頁");
   const [resumeTarget, setResumeTarget] = useState<string | undefined>();
   const [skillGroup, setSkillGroup] = useState<keyof typeof skillGroups>("核心能力");
-  const [insight, setInsight] = useState(0);
   const [evidenceCount, setEvidenceCount] = useState(0);
-  const [summaryCopied, setSummaryCopied] = useState(false);
 
   useEffect(() => {
     const legacyKey = ["path", "ly-experiences-v1"].join("");
@@ -143,18 +134,6 @@ export default function Home() {
     window.setTimeout(() => setNotice(""), 3000);
   }
 
-  async function copyCareerSummary() {
-    const summary = "具備使用者研究、產品企劃與資料分析經驗，能從模糊問題中整理需求，並透過訪談與原型驗證提出具體方向。";
-    try {
-      await navigator.clipboard.writeText(summary);
-      setSummaryCopied(true);
-      window.setTimeout(() => setSummaryCopied(false), 1800);
-    } catch {
-      setNotice("目前無法存取剪貼簿，請稍後再試");
-      window.setTimeout(() => setNotice(""), 2400);
-    }
-  }
-
   function handleNavigation(label: string) {
     if (label === "首頁分析" || label === "職涯分析") {
       setActiveView("首頁");
@@ -169,7 +148,10 @@ export default function Home() {
     previewFeature(label);
   }
 
-  if (!audience) return <AudienceGate onSelect={setAudience} />;
+  if (!audience) return <>
+    <AudienceGate onSelect={setAudience} onShowGuide={() => setShowGuide(true)} />
+    {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={(view) => { setAudience("user"); handleNavigation(view); }} />}
+  </>;
   if (audience === "business") return <EnterprisePortal onSwitchRole={() => setAudience(null)} />;
 
   return (
@@ -178,7 +160,7 @@ export default function Home() {
         <div className="brand">
           <span className="brand-mark">G</span>
           <span>GoodJob</span>
-          <button className="brand-guide-button" onClick={() => setShowGuide(true)} aria-label="產品導覽">i</button>
+          <button className="brand-guide-button" onClick={() => setShowGuide(true)} aria-label="產品導覽"><span aria-hidden="true">?</span></button>
         </div>
 
         <nav className="primary-nav" aria-label="主要導覽">
@@ -199,28 +181,14 @@ export default function Home() {
       </aside>
 
       <section className="main-area">
-        <header className="topbar">
-          <div className="mobile-brand"><span className="brand-mark">G</span><strong>GoodJob</strong></div>
-          <label className="search-box">
-            <span>⌕</span><input aria-label="搜尋經驗與技能" placeholder="搜尋經驗、技能或職缺" />
-          </label>
-          <div className="top-actions">
-            <button className="icon-button" aria-label="通知">○<span className="notification-dot" /></button>
-            <button className="add-button" onClick={() => setShowExperienceFlow(true)}>＋ 新增經驗</button>
-          </div>
-        </header>
-
         <div className="content">
-          {activeView === "首頁" && <>
+          {activeView === "首頁" && <div className="home-page">
           <section className="welcome-row">
             <div>
               <p className="eyebrow">THURSDAY, AUGUST 27</p>
               <h1>早安，{profile.name.length >= 3 ? profile.name.slice(-2) : profile.name} <span>👋</span></h1>
-              <p>每一段經驗都值得被好好記住。這是你目前的職涯全貌。</p>
+              <p>你的努力都會轉化成你的能力。查看你的職涯分析。</p>
             </div>
-            <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="選擇資料期間">
-              <option>近 12 個月</option><option>全部時間</option><option>今年</option>
-            </select>
           </section>
 
           <section className="hero-grid">
@@ -229,34 +197,24 @@ export default function Home() {
                 <span className="soft-label">你的職涯定位</span>
                 <h2>以使用者洞察為起點，<br />逐步走向產品決策與影響力。</h2>
                 <p>具備使用者研究、產品企劃與資料分析經驗，能從模糊問題中整理需求，並透過訪談與原型驗證提出具體方向。</p>
-                <div className="career-card-actions">
-                  <button onClick={copyCareerSummary}>{summaryCopied ? "✓ 已複製摘要" : "複製職涯摘要"}</button>
-                  <button onClick={() => handleNavigation("我的經驗")}>查看相關經驗 <span>→</span></button>
-                </div>
               </div>
               <div className="career-visual" aria-hidden="true">
                 <div className="orbit orbit-one" /><div className="orbit orbit-two" />
                 <div className="orbit-dot dot-one" /><div className="orbit-dot dot-two" />
                 <div className="center-gem">{experiences.length}<span>段經驗</span></div>
-              </div>
-            </article>
-
-            <article className="progress-card">
-              <div className="card-heading">
-                <div><span className="soft-label">職涯檔案</span><h3>資料完整度</h3></div><span className="trend">↑ 12%</span>
-              </div>
-              <div className="progress-body">
-                <div className="progress-ring"><span>72<small>%</small></span></div>
-                <ul><li><span className="done">✓</span>基本資料</li><li><span className="done">✓</span>3 段核心經驗</li><li><span>3</span>項成果待補數據</li></ul>
+                <div className="skill-gem">{hasNewExperience ? 21 : 18}<span>項技能</span></div>
               </div>
             </article>
           </section>
 
           <section className="metrics-grid">
-            <article className="metric-card"><div className="metric-icon green">◇</div><div><strong>{experiences.length}</strong><span>段經驗</span></div><small>{hasNewExperience ? "剛剛新增 1 段" : "本月新增 2 段"}</small></article>
-            <article className="metric-card"><div className="metric-icon purple">✦</div><div><strong>{hasNewExperience ? 21 : 18}</strong><span>項技能</span></div><small>{hasNewExperience ? "新增 3 項技能" : "6 項證據充分"}</small></article>
+            <button className="metric-card count-metric metric-link-card experience-metric" onClick={() => handleNavigation("我的經驗")}><div><strong><b>{experiences.length}</b> 段經驗</strong><small>{hasNewExperience ? <>剛剛新增 <b>1</b> 段</> : <>本月新增 <b>2</b> 段</>}</small></div></button>
+            <button className="metric-card count-metric metric-link-card skill-metric" onClick={() => handleNavigation("我的履歷")}><div><strong><b>{hasNewExperience ? 21 : 18}</b> 項技能</strong><small>{hasNewExperience ? <>新增 <b>3</b> 項技能</> : <><b>6</b> 項證據充分</>}</small></div></button>
             <article className="metric-card wide-metric">
-              <div><div className="metric-title"><span>職涯資產累積</span><strong>持續成長</strong></div><small>最近 6 個月新增 5 段可用經歷</small></div><Sparkline />
+              <div><div className="metric-title"><span>職涯資產</span><strong>持續成長 <i aria-hidden="true">↑</i></strong></div><small>最近 6 個月新增 <b>5</b> 段經歷</small></div>
+            </article>
+            <article className="metric-card count-metric metric-suggestion-card">
+              <div><strong>內容補強建議</strong><small className="suggestion-line"><span>3</span> 項成果待補數據</small></div>
             </article>
           </section>
 
@@ -269,8 +227,9 @@ export default function Home() {
                     <span className="timeline-pin" style={{ background: experience.color }} />
                     <span className="experience-date">{experience.date}</span>
                     <span className="experience-content">
-                      <span className="experience-meta"><em>{experience.type}</em>{experience.org}</span>
-                      <strong>{experience.title}</strong><span className="experience-description">{experience.description}</span>
+                      <span className="experience-meta"><em className={`experience-type experience-type-${experienceTypeTone[experience.type] ?? "other"}`}>{experience.type}</em><span>{experience.org}</span></span>
+                      <strong>{experience.title}</strong>
+                      <span className="experience-description">{experience.description}</span>
                       <span className="tag-row">{experience.tags.map((tag) => <i key={tag}>{tag}</i>)}</span>
                     </span><span className="item-arrow">›</span>
                   </button>
@@ -280,25 +239,32 @@ export default function Home() {
 
             <div className="right-column">
               <article className="panel skills-panel">
-                <div className="analysis-panel-header"><div><span className="page-kicker">SKILL EVIDENCE</span><h3>技能與證據</h3></div><button onClick={() => setShowExperienceFlow(true)}>補充證據　＋</button></div>
+                <div className="analysis-panel-header"><div><span className="page-kicker">SKILL EVIDENCE</span><h3>技能與證據</h3></div><button onClick={() => handleNavigation("我的履歷")}>查看全部　→</button></div>
                 <div className="analysis-tabs">{Object.keys(skillGroups).map((group) => <button className={skillGroup === group ? "active" : ""} key={group} onClick={() => setSkillGroup(group as keyof typeof skillGroups)}>{group}</button>)}</div>
                 <div className="evidence-skill-list home-evidence-skill-list">
-                  {skillGroups[skillGroup].map(([name, score, sources, status], index) => <button key={String(name)} onClick={() => previewFeature(String(name))}>
-                    <span className="skill-number">{String(index + 1).padStart(2, "0")}</span><span className="skill-name"><strong>{name}</strong><small>{sources}</small></span><span className="analysis-skill-bar"><i style={{ width: String(score) + "%" }} /></span><span className={"evidence-status status-" + (index > 3 ? "weak" : index > 1 ? "growing" : "strong")}>{status}</span><span>›</span>
+                  {skillGroups[skillGroup].slice(0, 3).map(([name, score, sources, status], index) => <button key={String(name)} onClick={() => previewFeature(String(name))}>
+                    <span className="skill-number">{String(index + 1).padStart(2, "0")}</span><span className="skill-name"><strong>{name}</strong><small>{sources}</small></span><span className="analysis-skill-bar"><i style={{ width: String(score) + "%" }} /></span><span className={"evidence-status status-" + (index > 3 ? "weak" : index > 1 ? "growing" : "strong")}>{status}</span>
                   </button>)}
+                  <div className="home-skill-more" aria-label="查看更多技能">⋮</div>
                 </div>
               </article>
 
-              <article className="next-step-card">
-                <span className="next-icon">✦</span>
-                <div><span className="soft-label">本週行動</span><h3>準備 Orbit 產品面試</h3><p>先用核心經驗完成一題自我介紹練習。</p></div>
-                <button onClick={() => handleNavigation("職缺探索")}>瀏覽職缺</button>
+              <article className="panel recent-actions-panel">
+                <div className="recent-actions-content">
+                  <section className="recent-action-row resume-action-row">
+                    <div className="recent-action-copy"><small>正在編輯的履歷</small><strong>Orbit APM 履歷</strong></div>
+                    <button className="recent-action-button" onClick={() => handleNavigation("我的履歷")}>繼續編輯</button>
+                  </section>
+                  <section className="recent-action-row">
+                    <div className="recent-action-copy job-action-copy"><small>可能適合的職缺</small><div className="job-action-main"><button className="recent-job-link" onClick={() => handleNavigation("職缺探索")}><strong>Orbit 數位產品 · Associate Product Manager</strong></button><button className="recent-action-button" onClick={() => handleNavigation("職缺探索")}>探索更多</button></div></div>
+                  </section>
+                </div>
               </article>
             </div>
           </section>
 
           <section className="home-career-analysis" id="home-career-analysis">
-            <div className="home-analysis-heading"><div><span className="page-kicker">CAREER OVERVIEW</span><h2>從經驗看見你的職涯全貌</h2><p>技能證據、經驗組成、成長軌跡與下一步觀察，現在都集中在首頁。</p></div><span>{experiences.length} 段經驗 · {evidenceCount} 項附件證據</span></div>
+            <div className="home-analysis-heading"><div><span className="page-kicker">CAREER OVERVIEW</span><h2>職涯全貌與成長軌跡</h2></div><span>{experiences.length} 段經驗 · {evidenceCount} 項附件證據</span></div>
             <div className="home-analysis-grid">
               <article className="analysis-panel distribution-panel">
                 <div className="analysis-panel-header"><div><span className="page-kicker">EXPERIENCE MIX</span><h3>經驗分布</h3></div></div>
@@ -314,12 +280,8 @@ export default function Home() {
               </article>
             </div>
 
-            <section className="insight-section">
-              <div className="insight-title"><div><span className="page-kicker">GOODJOB OBSERVATIONS</span><h2>從你的經驗中，我們看見了這些</h2></div><span>所有觀察都能查看來源，不使用人格推測</span></div>
-              <div className="insight-layout"><div className="insight-list">{careerInsights.map((item, index) => <button className={insight === index ? "active" : ""} key={item.label} onClick={() => setInsight(index)}><span>{item.icon}</span><div><small>{item.label}</small><strong>{item.title}</strong></div><b>›</b></button>)}</div><article className="insight-detail"><span className="insight-detail-icon">{careerInsights[insight].icon}</span><small>{careerInsights[insight].label}</small><h3>{careerInsights[insight].title}</h3><p>{careerInsights[insight].text}</p><div><span>⌁</span><small>判斷依據</small><strong>{careerInsights[insight].source}</strong></div><button onClick={() => handleNavigation("我的經驗")}>查看相關經驗　→</button></article></div>
-            </section>
           </section>
-          </>}
+          </div>}
           {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} />}
           {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} />}
           {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); handleNavigation("我的履歷"); }} />}
