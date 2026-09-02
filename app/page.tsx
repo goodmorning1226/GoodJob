@@ -28,6 +28,7 @@ const skillGroups = {
 
 const experienceTypeTone: Record<string, string> = {
   "實習": "internship",
+  "正職": "work",
   "工作": "work",
   "競賽": "competition",
   "專案": "project",
@@ -35,6 +36,17 @@ const experienceTypeTone: Record<string, string> = {
   "社團": "club",
   "研究": "research",
 };
+
+const experienceDistributionCategories = [
+  { label: "專案", types: ["專案"], color: "var(--type-project)" },
+  { label: "正職", types: ["正職", "工作"], color: "var(--type-work)" },
+  { label: "實習", types: ["實習"], color: "var(--type-internship)" },
+  { label: "競賽", types: ["競賽"], color: "var(--type-competition)" },
+  { label: "修課", types: ["修課"], color: "var(--type-course)" },
+  { label: "社團", types: ["社團"], color: "var(--type-club)" },
+  { label: "研究", types: ["研究"], color: "var(--type-research)" },
+  { label: "其他", types: [], color: "var(--type-other)" },
+];
 
 const initialExperiences: NewExperience[] = [
   {
@@ -119,6 +131,23 @@ export default function Home() {
   }, [experiences]);
 
   const hasNewExperience = experiences.length > initialExperiences.length;
+  const knownDistributionTypes = new Set(experienceDistributionCategories.flatMap((category) => category.types));
+  const distributionData = experienceDistributionCategories
+    .map((category) => {
+      const count = category.label === "其他"
+        ? experiences.filter((experience) => !knownDistributionTypes.has(experience.type)).length
+        : experiences.filter((experience) => category.types.includes(experience.type)).length;
+      return { ...category, count, percentage: experiences.length ? Math.round(count / experiences.length * 100) : 0 };
+    })
+    .sort((first, second) => second.count - first.count);
+  let distributionCursor = 0;
+  const distributionGradient = experiences.length
+    ? `conic-gradient(${distributionData.map((category) => {
+      const start = distributionCursor;
+      distributionCursor += category.count / experiences.length * 100;
+      return `${category.color} ${start}% ${distributionCursor}%`;
+    }).join(", ")})`
+    : "#e7ece8";
 
   function previewFeature(label: string) {
     setNotice(`${label}將在下一個 Prototype 階段開放`);
@@ -198,36 +227,31 @@ export default function Home() {
                 <h2>以使用者洞察為起點，<br />逐步走向產品決策與影響力。</h2>
                 <p>具備使用者研究、產品企劃與資料分析經驗，能從模糊問題中整理需求，並透過訪談與原型驗證提出具體方向。</p>
               </div>
-              <div className="career-visual" aria-hidden="true">
-                <div className="orbit orbit-one" /><div className="orbit orbit-two" />
-                <div className="orbit-dot dot-one" /><div className="orbit-dot dot-two" />
-                <div className="center-gem">{experiences.length}<span>段經驗</span></div>
-                <div className="skill-gem">{hasNewExperience ? 21 : 18}<span>項技能</span></div>
+              <div className="career-visual">
+                <div className="orbit orbit-one" aria-hidden="true" /><div className="orbit orbit-two" aria-hidden="true" />
+                <div className="orbit-dot dot-one" aria-hidden="true" /><div className="orbit-dot dot-two" aria-hidden="true" />
+                <button className="center-gem career-metric-gem" onClick={() => handleNavigation("我的經驗")} aria-label="前往我的經驗">
+                  <strong><b>{experiences.length}</b> <span>段經驗</span></strong>
+                  <small>{hasNewExperience ? <>剛剛新增 <b>1</b> 段</> : <>本月新增 <b>2</b> 段</>}</small>
+                </button>
+                <button className="skill-gem career-metric-gem" onClick={() => handleNavigation("我的履歷")} aria-label="前往我的履歷">
+                  <strong><b>{hasNewExperience ? 21 : 18}</b> <span>項技能</span></strong>
+                  <small>{hasNewExperience ? <>新增 <b>3</b> 項技能</> : <><b>6</b> 項證據充分</>}</small>
+                </button>
               </div>
-            </article>
-          </section>
-
-          <section className="metrics-grid">
-            <button className="metric-card count-metric metric-link-card experience-metric" onClick={() => handleNavigation("我的經驗")}><div><strong><b>{experiences.length}</b> 段經驗</strong><small>{hasNewExperience ? <>剛剛新增 <b>1</b> 段</> : <>本月新增 <b>2</b> 段</>}</small></div></button>
-            <button className="metric-card count-metric metric-link-card skill-metric" onClick={() => handleNavigation("我的履歷")}><div><strong><b>{hasNewExperience ? 21 : 18}</b> 項技能</strong><small>{hasNewExperience ? <>新增 <b>3</b> 項技能</> : <><b>6</b> 項證據充分</>}</small></div></button>
-            <article className="metric-card wide-metric">
-              <div><div className="metric-title"><span>職涯資產</span><strong>持續成長 <i aria-hidden="true">↑</i></strong></div><small>最近 6 個月新增 <b>5</b> 段經歷</small></div>
-            </article>
-            <article className="metric-card count-metric metric-suggestion-card">
-              <div><strong>內容補強建議</strong><small className="suggestion-line"><span>3</span> 項成果待補數據</small></div>
             </article>
           </section>
 
           <section className="dashboard-grid">
             <article className="panel experiences-panel">
-              <div className="panel-header"><div><span className="soft-label">RECENT</span><h3>最近經驗</h3></div><button onClick={() => handleNavigation("我的經驗")}>查看全部 <span>→</span></button></div>
+              <div className="panel-header"><div><span className="soft-label">RECENT</span><h3>最近經驗</h3></div><button className="panel-view-all" onClick={() => handleNavigation("我的經驗")}>查看全部 <span aria-hidden="true">→</span></button></div>
               <div className="experience-list">
                 {experiences.slice(0, 3).map((experience) => (
                   <button className="experience-item" key={experience.title} onClick={() => handleNavigation("我的經驗")}>
-                    <span className="timeline-pin" style={{ background: experience.color }} />
+                    <span className="timeline-pin" style={{ color: `var(--type-${experienceTypeTone[experience.type] ?? "other"})`, background: `var(--type-${experienceTypeTone[experience.type] ?? "other"})` }} />
                     <span className="experience-date">{experience.date}</span>
                     <span className="experience-content">
-                      <span className="experience-meta"><em className={`experience-type experience-type-${experienceTypeTone[experience.type] ?? "other"}`}>{experience.type}</em><span>{experience.org}</span></span>
+                      <span className="experience-meta"><em className={`experience-type experience-type-${experienceTypeTone[experience.type] ?? "other"}`}>{experience.type === "工作" ? "正職" : experience.type}</em><span>{experience.org}</span></span>
                       <strong>{experience.title}</strong>
                       <span className="experience-description">{experience.description}</span>
                       <span className="tag-row">{experience.tags.map((tag) => <i key={tag}>{tag}</i>)}</span>
@@ -239,13 +263,12 @@ export default function Home() {
 
             <div className="right-column">
               <article className="panel skills-panel">
-                <div className="analysis-panel-header"><div><span className="page-kicker">SKILL EVIDENCE</span><h3>技能與證據</h3></div><button onClick={() => handleNavigation("我的履歷")}>查看全部　→</button></div>
+                <div className="analysis-panel-header"><div><span className="page-kicker">SKILL EVIDENCE</span><h3>技能與證據</h3></div><button className="panel-view-all" onClick={() => handleNavigation("我的履歷")}>查看全部 <span aria-hidden="true">→</span></button></div>
                 <div className="analysis-tabs">{Object.keys(skillGroups).map((group) => <button className={skillGroup === group ? "active" : ""} key={group} onClick={() => setSkillGroup(group as keyof typeof skillGroups)}>{group}</button>)}</div>
                 <div className="evidence-skill-list home-evidence-skill-list">
                   {skillGroups[skillGroup].slice(0, 3).map(([name, score, sources, status], index) => <button key={String(name)} onClick={() => previewFeature(String(name))}>
                     <span className="skill-number">{String(index + 1).padStart(2, "0")}</span><span className="skill-name"><strong>{name}</strong><small>{sources}</small></span><span className="analysis-skill-bar"><i style={{ width: String(score) + "%" }} /></span><span className={"evidence-status status-" + (index > 3 ? "weak" : index > 1 ? "growing" : "strong")}>{status}</span>
                   </button>)}
-                  <div className="home-skill-more" aria-label="查看更多技能">⋮</div>
                 </div>
               </article>
 
@@ -264,18 +287,21 @@ export default function Home() {
           </section>
 
           <section className="home-career-analysis" id="home-career-analysis">
-            <div className="home-analysis-heading"><div><span className="page-kicker">CAREER OVERVIEW</span><h2>職涯全貌與成長軌跡</h2></div><span>{experiences.length} 段經驗 · {evidenceCount} 項附件證據</span></div>
+            <div className="home-analysis-heading"><div><span className="page-kicker">CAREER OVERVIEW</span><h2>職涯全貌與成長軌跡</h2></div></div>
             <div className="home-analysis-grid">
               <article className="analysis-panel distribution-panel">
                 <div className="analysis-panel-header"><div><span className="page-kicker">EXPERIENCE MIX</span><h3>經驗分布</h3></div></div>
-                <div className="distribution-chart"><div className="donut"><span><strong>{experiences.length}</strong>段經驗</span></div><ul><li><i className="c-one" /><span>專案</span><b>38%</b></li><li><i className="c-two" /><span>實習／工作</span><b>25%</b></li><li><i className="c-three" /><span>競賽</span><b>13%</b></li><li><i className="c-four" /><span>修課／研究／其他</span><b>24%</b></li></ul></div>
+                <div className="distribution-chart">
+                  <div className="donut" style={{ background: distributionGradient }}><span><strong>{experiences.length}</strong>段經驗</span></div>
+                  <ul>{distributionData.map((category) => <li key={category.label}><i style={{ background: category.color }} /><span>{category.label}（{category.count}項）</span><b>{category.percentage}%</b></li>)}</ul>
+                </div>
                 <p className="distribution-note"><span>✦</span>你的經驗以實作專案為主，已具備明確方向；下一步可增加真實商業情境中的成果證據。</p>
               </article>
 
               <article className="analysis-panel growth-panel">
-                <div className="analysis-panel-header"><div><span className="page-kicker">GROWTH TIMELINE</span><h3>能力發展軌跡</h3></div><span className="growth-legend"><i />責任與影響範圍</span></div>
-                <div className="growth-track"><div className="growth-line"><span style={{ height: "28%" }} /><span style={{ height: "43%" }} /><span style={{ height: "66%" }} /><span style={{ height: "88%" }} /></div>{[
-                  ["2023", "開始探索", "課程中首次進行訪談與資料整理", "參與者"], ["2024", "方法建立", "獨立規劃研究並完成互動原型", "執行者"], ["2025", "跨域整合", "將研究洞察轉為產品與提案方向", "規劃者"], ["2026", "擴大影響", "主導完整流程並協調團隊推進", "負責人"],
+                <div className="analysis-panel-header"><div><span className="page-kicker">GROWTH TIMELINE</span><h3>能力發展軌跡</h3></div></div>
+                <div className="growth-track"><div className="growth-line" />{[
+                  ["2023", "開始探索", "課程中首次進行訪談與資料整理", "參與者"], ["2024", "方法建立", "獨立規劃研究並完成互動原型", "執行者"], ["2025", "跨域整合", "將研究洞察轉為產品與提案方向", "規劃者"], ["2026", "擴大影響", "主導完整流程並協調團隊推進", "負責人"], ["未來", "下一步行動", "補強真實商業情境中的成果證據", "行動建議"],
                 ].map(([year, stage, text, role], index) => <div className={"growth-node node-" + (index + 1)} key={year}><span>{year}</span><i /><div><small>{role}</small><strong>{stage}</strong><p>{text}</p></div></div>)}</div>
               </article>
             </div>

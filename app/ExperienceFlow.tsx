@@ -191,7 +191,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
               <div className="field-row">
                 <label>這是什麼類型的經驗？</label>
                 <select value={type} onChange={(event) => setType(event.target.value)}>
-                  <option>專案</option><option>修課</option><option>實習</option><option>工作</option><option>競賽</option><option>社團</option><option>研究</option>
+                  <option>專案</option><option>修課</option><option>實習</option><option value="工作">正職</option><option>競賽</option><option>社團</option><option>研究</option>
                 </select>
               </div>
               {type === "修課" && <div className="course-capture-fields">
