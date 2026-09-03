@@ -38,14 +38,14 @@ const experienceTypeTone: Record<string, string> = {
 };
 
 const experienceDistributionCategories = [
-  { label: "專案", types: ["專案"], color: "var(--type-project)" },
-  { label: "正職", types: ["正職", "工作"], color: "var(--type-work)" },
-  { label: "實習", types: ["實習"], color: "var(--type-internship)" },
-  { label: "競賽", types: ["競賽"], color: "var(--type-competition)" },
-  { label: "修課", types: ["修課"], color: "var(--type-course)" },
-  { label: "社團", types: ["社團"], color: "var(--type-club)" },
-  { label: "研究", types: ["研究"], color: "var(--type-research)" },
-  { label: "其他", types: [], color: "var(--type-other)" },
+  { label: "專案", types: ["專案"], color: "var(--type-project-border)" },
+  { label: "正職", types: ["正職", "工作"], color: "var(--type-work-border)" },
+  { label: "實習", types: ["實習"], color: "var(--type-internship-border)" },
+  { label: "競賽", types: ["競賽"], color: "var(--type-competition-border)" },
+  { label: "修課", types: ["修課"], color: "var(--type-course-border)" },
+  { label: "社團", types: ["社團"], color: "var(--type-club-border)" },
+  { label: "研究", types: ["研究"], color: "var(--type-research-border)" },
+  { label: "其他", types: [], color: "var(--type-other-border)" },
 ];
 
 const initialExperiences: NewExperience[] = [
@@ -211,7 +211,7 @@ export default function Home() {
 
       <section className="main-area">
         <div className="content">
-          {activeView === "首頁" && <div className="home-page">
+          {activeView === "首頁" && <div className="home-page page-enter">
           <section className="welcome-row">
             <div>
               <p className="eyebrow">THURSDAY, AUGUST 27</p>

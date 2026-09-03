@@ -27,8 +27,8 @@ const schemaDefinitions: SchemaDefinition[] = [
   { key: "role", label: "個人角色", question: "你在這段經驗中主要負責什麼？", placeholder: "例如：我負責訪談規劃、洞察整理與原型設計。", pattern: /我負責|我的角色|擔任|主導|帶領|協助/ },
   { key: "action", label: "行動", question: "你實際採取了哪些行動？", placeholder: "例如：訪談學生、整理痛點，並進行兩輪原型測試。", pattern: /訪談|整理|分析|規劃|設計|製作|執行|測試|協調|迭代/ },
   { key: "method", label: "工具／方法", question: "你使用了哪些工具、方法或知識？", placeholder: "例如：半結構式訪談、服務藍圖與 Figma。", pattern: /Figma|Excel|GA4|問卷|訪談|測試|服務藍圖|原型|分析法|研究法/i },
-  { key: "result", label: "成果／影響", question: "最後產生了什麼成果或改變？", placeholder: "例如：團隊採用新版流程，降低完成任務所需步驟。", pattern: /最後|成果|結果|提升|降低|縮短|增加|完成|獲得|採用|減少/ },
-  { key: "evidence", label: "可驗證證據", question: "有什麼數字、作品或附件可以支持這項成果？", placeholder: "例如：測試 8 位使用者，流程由 7 步縮短為 4 步。", pattern: /\d|％|%|獎|證書|簡報|報告|作品|附件/ },
+  { key: "result", label: "成果／影響", question: "最後產生了什麼具體成果或影響？", placeholder: "例如：團隊採用新版流程，降低完成任務所需步驟。", pattern: /最後|成果|結果|提升|降低|縮短|增加|完成|獲得|採用|減少/ },
+  { key: "evidence", label: "可驗證證據", question: "有什麼數據、作品或附件可以支持這項成果？", placeholder: "例如：測試 8 位使用者，流程由 7 步縮短為 4 步。", pattern: /\d|％|%|獎|證書|簡報|報告|作品|附件/ },
   { key: "learning", label: "學習／反思", question: "這段經驗讓你學到了什麼？", placeholder: "例如：我學會把研究洞察轉成可測試的設計決策。", pattern: /學到|學會|理解|反思|體會|後來發現/ },
 ];
 
