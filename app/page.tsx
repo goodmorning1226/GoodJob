@@ -232,11 +232,11 @@ export default function Home() {
                 <div className="orbit-dot dot-one" aria-hidden="true" /><div className="orbit-dot dot-two" aria-hidden="true" />
                 <button className="center-gem career-metric-gem" onClick={() => handleNavigation("我的經驗")} aria-label="前往我的經驗">
                   <strong><b>{experiences.length}</b> <span>段經驗</span></strong>
-                  <small>{hasNewExperience ? <>剛剛新增 <b>1</b> 段</> : <>本月新增 <b>2</b> 段</>}</small>
+                  <small>本月新增 <b>{hasNewExperience ? 1 : 2}</b> 段</small>
                 </button>
                 <button className="skill-gem career-metric-gem" onClick={() => handleNavigation("我的履歷")} aria-label="前往我的履歷">
                   <strong><b>{hasNewExperience ? 21 : 18}</b> <span>項技能</span></strong>
-                  <small>{hasNewExperience ? <>新增 <b>3</b> 項技能</> : <><b>6</b> 項證據充分</>}</small>
+                  <small>本月新增 <b>3</b> 項</small>
                 </button>
               </div>
             </article>

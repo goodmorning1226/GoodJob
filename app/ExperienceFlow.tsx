@@ -39,6 +39,7 @@ const resultSkillGroups = {
 
 export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [step, setStep] = useState(1);
+  const [analysisTarget, setAnalysisTarget] = useState<2 | 4 | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [type, setType] = useState("專案");
   const [startDate, setStartDate] = useState("2026-02");
@@ -67,7 +68,6 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [clubName, setClubName] = useState("");
   const [clubPosition, setClubPosition] = useState("");
   const [researchTitle, setResearchTitle] = useState("");
-  const [resultSkillGroup, setResultSkillGroup] = useState<keyof typeof resultSkillGroups>("核心能力");
   const [schemaAnalysis, setSchemaAnalysis] = useState<ExperienceSchemaResult[]>([]);
   const [schemaAnswers, setSchemaAnswers] = useState<Partial<Record<ExperienceSchemaKey, string>>>({});
   const attachmentInput = useRef<HTMLInputElement>(null);
@@ -79,10 +79,13 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   }
 
   useEffect(() => {
-    if (step !== 3) return;
-    const timer = window.setTimeout(() => setStep(4), 1150);
+    if (analysisTarget === null) return;
+    const timer = window.setTimeout(() => {
+      setStep(analysisTarget);
+      setAnalysisTarget(null);
+    }, 1200);
     return () => window.clearTimeout(timer);
-  }, [step]);
+  }, [analysisTarget]);
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -169,27 +172,21 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
       : item);
     setSchemaAnalysis(analysis);
     setSchemaAnswers({});
-    if (analysis.every((item) => item.detected)) {
-      applyStructuredDetails(analysis, {});
-      setStep(3);
-      return;
-    }
-    setStep(2);
+    setAnalysisTarget(2);
   }
 
   function finishClarification() {
     applyStructuredDetails(schemaAnalysis, schemaAnswers);
-    setStep(3);
+    setAnalysisTarget(4);
   }
 
   function reorganizeFromSchema() {
     applyStructuredDetails(schemaAnalysis, schemaAnswers);
-    setStep(3);
+    setStep(4);
   }
 
   const missingSchemaFields = schemaAnalysis.filter((item) => !item.detected);
   const unresolvedSchemaFields = schemaAnalysis.filter((field) => !schemaValue(schemaAnalysis, schemaAnswers, field.key).trim());
-  const answeredMissingCount = missingSchemaFields.filter((field) => schemaValue(schemaAnalysis, schemaAnswers, field.key).trim()).length;
   const schemaCompleteness = schemaAnalysis.length
     ? Math.round(((schemaAnalysis.length - unresolvedSchemaFields.length) / schemaAnalysis.length) * 100)
     : 0;
@@ -203,7 +200,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const hasValidProjectFields = type !== "專案" || Boolean(projectTitle.trim());
   const hasValidClubFields = type !== "社團" || Boolean(clubName.trim() && clubPosition.trim());
   const hasValidResearchFields = type !== "研究" || Boolean(researchTitle.trim());
-  const visibleStep = step >= 3 ? 3 : step;
+  const visibleStep = analysisTarget === 2 ? 2 : analysisTarget === 4 || step >= 3 ? 3 : step;
 
   return (
     <div className={`flow-overlay${isClosing ? " closing" : ""}`} role="dialog" aria-modal="true" aria-label="新增經驗" onMouseDown={(event) => event.target === event.currentTarget && closeFlow()}>
@@ -220,7 +217,18 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
           <button className="flow-close" onClick={closeFlow} aria-label="關閉新增經驗">×</button>
         </header>
 
-        {step === 1 && (
+        {analysisTarget !== null && (
+          <section className="processing-step analysis-transition">
+            <div className="analysis-transition-card">
+              <div className="analysis-loader" aria-hidden="true" />
+              <span className="flow-kicker">GOODJOB · ANALYZING</span>
+              <h2>{analysisTarget === 2 ? "正在分析你的描述" : "正在整理這段經驗"}</h2>
+              <p>{analysisTarget === 2 ? "找出經驗中已具備與還能補充的細節" : "將描述轉化成履歷可用語言"}</p>
+            </div>
+          </section>
+        )}
+
+        {analysisTarget === null && step === 1 && (
           <section className="flow-content entry-step">
             <div className="flow-intro">
               <span className="flow-kicker">STEP 01 · CAPTURE</span>
@@ -283,7 +291,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
           </section>
         )}
 
-        {step === 2 && (
+        {analysisTarget === null && step === 2 && (
           <section className="flow-content questions-step">
             <div className="flow-intro">
               <span className="flow-kicker">STEP 02 · CLARIFY</span>
@@ -301,17 +309,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
           </section>
         )}
 
-        {step === 3 && (
-          <section className="processing-step">
-            <div className="processing-mark"><span>✦</span><i /><i /><i /></div>
-            <span className="flow-kicker">GOODJOB IS ORGANIZING</span>
-            <h2>正在把零散細節整理成職涯資產</h2>
-            <div className="processing-list"><span className="done">✓　將原始敘述拆入 8 個固定欄位</span><span className="done">✓　{missingSchemaFields.length ? "已補充 " + answeredMissingCount + " 項，保留 " + unresolvedSchemaFields.length + " 項待補" : "原始敘述完整，已略過補充"}</span>{attachments.length > 0 && <span className="done">✓　比對 {attachments.length} 份成果附件</span>}<span>○　提取可驗證的技能</span></div>
-            <small>這是 Prototype 模擬，不會呼叫任何外部 API</small>
-          </section>
-        )}
-
-        {step === 4 && (
+        {analysisTarget === null && step === 4 && (
           <section className="flow-content result-step">
             <div className="result-heading">
               <div><span className="flow-kicker">STEP 03 · ORGANIZE</span><p>將經驗轉化成履歷可用語言</p></div>
@@ -340,8 +338,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
                 <article className="result-card skill-card">
                   <div className="result-card-title"><span>提取技能</span><button className="add-skill-button">＋ 新增技能</button></div>
                   <div className="skill-chips">
-                    <div className="result-skill-tabs">{Object.keys(resultSkillGroups).map((group) => <button className={resultSkillGroup === group ? "active" : ""} key={group} onClick={() => setResultSkillGroup(group as keyof typeof resultSkillGroups)}>{group}</button>)}</div>
-                    <div className="result-skill-items">{resultSkillGroups[resultSkillGroup].map((skill) => <span key={skill}>{skill} <b>{skill === "團隊協作" ? "?" : "✓"}</b></span>)}</div>
+                    <div className="result-skill-table">{Object.entries(resultSkillGroups).map(([group, skills]) => <div className="result-skill-row" key={group}><strong>{group}</strong><div>{skills.map((skill) => <span key={skill}>{skill} <b>{skill === "團隊協作" ? "?" : "✓"}</b></span>)}</div></div>)}</div>
                   </div>
                 </article>
                 <article className="result-card source-card"><div><strong>事實來源完整</strong><p>{attachments.length ? `角色與成果由原始描述及 ${attachments.length} 份附件共同支持。` : "角色、方法與成果都有原始描述支持。團隊協作仍需要更多細節。"}</p></div></article>
@@ -352,7 +349,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
           </section>
         )}
 
-        {step === 5 && (
+        {analysisTarget === null && step === 5 && (
           <section className="flow-content schema-edit-step">
             <div className="flow-intro">
               <span className="flow-kicker">EDIT EXPERIENCE STRUCTURE</span>
