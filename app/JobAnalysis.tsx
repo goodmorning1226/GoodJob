@@ -25,7 +25,7 @@ type ResumeChoice = { id: string; title: string; company: string; template: stri
 
 const resumeChoices: ResumeChoice[] = [
   { id: "orbit-apm", title: "Associate Product Manager", company: "Orbit 數位產品", template: "ATS 專業版", updated: "今天 14:32", color: "green" },
-  { id: "ux-research", title: "UX Research Assistant", company: "日日生活科技", template: "專案導向版", updated: "昨天", color: "purple" },
+  { id: "daily-ux", title: "UX Research Assistant", company: "日日生活科技", template: "專案導向版", updated: "昨天", color: "purple" },
   { id: "general", title: "通用求職履歷", company: "未指定職缺", template: "ATS 專業版", updated: "8 月 22 日", color: "orange" },
 ];
 

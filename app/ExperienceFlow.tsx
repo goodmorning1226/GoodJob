@@ -367,7 +367,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
                     ] as const).map(([key, label]) => <div key={key}><dt>{label}</dt><dd className={schemaValue(schemaAnalysis, schemaAnswers, key) ? "" : "schema-value-missing"}>{schemaValue(schemaAnalysis, schemaAnswers, key) || "尚未補充"}</dd></div>)}
                   </dl>
                 </article>
-                {attachments.length > 0 && <article className="result-card result-attachments"><div className="result-card-title"><span>成果附件分析</span><small>{attachments.length} 份已納入</small></div>{attachments.map((item) => <div key={item.id}><span>{item.type.includes("獎") ? "◇" : item.type.includes("簡報") ? "▤" : "≡"}</span><div><strong>{item.name}</strong><small>{item.type} · 提供成果與技能證據</small></div><b>✓</b></div>)}</article>}
+                {attachments.length > 0 && <article className="result-card result-attachments"><div className="result-card-title"><span>成果附件</span><small>{attachments.length} 份已納入</small></div>{attachments.map((item) => <div key={item.id}><span>{item.type.includes("獎") ? "◇" : item.type.includes("簡報") ? "▤" : "≡"}</span><div><strong>{item.name}</strong><small>{item.type} · 提供成果與技能證據</small></div><b>✓</b></div>)}</article>}
               </div>
 
               <aside className="result-side">

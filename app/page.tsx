@@ -164,13 +164,30 @@ export default function Home() {
     window.setTimeout(() => setNotice(""), 3000);
   }
 
+  function resetTalentPrototype() {
+    ["goodjob-experiences-v1", "goodjob-evidence-v1", "goodjob-resume-experience-links-v1", "goodjob-chat-messages-v1"].forEach((key) => window.localStorage.removeItem(key));
+    setExperiences(initialExperiences);
+    setProfile({
+      name: "宋宇倫",
+      bio: "喜歡把模糊問題拆成可以研究與驗證的方向，具備使用者研究、產品企劃與資料分析經驗。",
+      avatar: "",
+    });
+    setShowExperienceFlow(false);
+    setShowJobResumeFlow(false);
+    setShowGeneratedResumeEditor(false);
+    setResumeTarget(undefined);
+    setActiveView("首頁");
+    setNotice("人才端示範資料已重設");
+    window.setTimeout(() => setNotice(""), 2400);
+  }
+
   function handleNavigation(label: string) {
     if (label === "首頁分析" || label === "職涯分析") {
       setActiveView("首頁");
       window.setTimeout(() => document.getElementById("home-career-analysis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
       return;
     }
-    if (["首頁", "我的經驗", "我的履歷", "職缺探索"].includes(label)) {
+    if (["首頁", "我的經驗", "我的履歷", "職缺探索", "聊天室"].includes(label)) {
       if (label !== "我的履歷") {
         setShowGeneratedResumeEditor(false);
         if (!showJobResumeFlow) setResumeTarget(undefined);
@@ -184,7 +201,7 @@ export default function Home() {
 
   if (!audience) return <>
     <AudienceGate onSelect={setAudience} onShowGuide={() => setShowGuide(true)} />
-    {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={(view) => { setAudience("user"); handleNavigation(view); }} />}
+    {showGuide && <ProductGuide audience="talent" onClose={() => setShowGuide(false)} onReset={resetTalentPrototype} onNavigate={(view) => { setAudience("user"); handleNavigation(view); }} />}
   </>;
   if (audience === "business") return <EnterprisePortal onSwitchRole={() => setAudience(null)} />;
 
@@ -326,7 +343,7 @@ export default function Home() {
       {notice && <div className="toast" role="status"><span>✦</span>{notice}</div>}
       {showExperienceFlow && <ExperienceFlow onClose={() => setShowExperienceFlow(false)} onComplete={completeExperience} />}
       {showJobResumeFlow && <ResumeBuilder key={`job-resume-${resumeTarget}`} experiences={experiences} initialTarget={resumeTarget} embedded onClose={() => { setShowJobResumeFlow(false); setResumeTarget(undefined); }} onGenerated={() => { setShowJobResumeFlow(false); setShowGeneratedResumeEditor(true); handleNavigation("我的履歷"); }} />}
-      {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={handleNavigation} />}
+      {showGuide && <ProductGuide audience="talent" onClose={() => setShowGuide(false)} onReset={resetTalentPrototype} onNavigate={handleNavigation} />}
       {showProfileEditor && <ProfileEditModal profile={profile} onClose={() => setShowProfileEditor(false)} onSave={(nextProfile) => { setProfile(nextProfile); setShowProfileEditor(false); setNotice("個人資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
       <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"我的履歷",icon:"▤"},{label:"職缺探索",icon:"◎"},{label:"聊天室",icon:"▢"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => item.label === "聊天室" ? setActiveView("聊天室") : handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "我的履歷" ? "履歷" : item.label === "職缺探索" ? "探索" : item.label}</button>)}</nav>
     </main>

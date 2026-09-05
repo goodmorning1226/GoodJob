@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ProfileEditModal from "./ProfileEditModal";
 import ChatWorkspace from "./ChatWorkspace";
+import ProductGuide from "./ProductGuide";
 
 type Talent = {
   id: number;
@@ -333,6 +334,7 @@ export default function EnterprisePortal({
   const [companyProfile, setCompanyProfile] = useState({ name: "Orbit 數位產品", bio: "招募團隊", avatar: "" });
   const [managedJobQuery, setManagedJobQuery] = useState("");
   const [managedJobSort, setManagedJobSort] = useState<"最新發布" | "瀏覽數" | "有興趣" | "已結束">("最新發布");
+  const [showGuide, setShowGuide] = useState(false);
 
   const companyJobs = useMemo(
     () => [
@@ -487,13 +489,55 @@ export default function EnterprisePortal({
     setJobEditorOpen(true);
   }
 
+  function resetBusinessPrototype() {
+    window.localStorage.removeItem("goodjob-chat-messages-v1");
+    setView("jobs");
+    setChatTalentName("Yulun");
+    setTitle("Associate Product Manager");
+    setDescription("協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。");
+    setRequirements("使用者研究\n產品需求分析\n跨部門協作\n數據分析能力");
+    setBonusRequirements("Figma\nSQL");
+    setActiveJob("Associate Product Manager");
+    setPublishedJobDescription("協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。");
+    setPublishedJobRequirements("使用者研究\n產品需求分析\n跨部門協作\n數據分析能力");
+    setPublishedJobBonusRequirements("Figma\nSQL");
+    setSelectedManagedJob(null);
+    setEditingJob(null);
+    setClosedJobs([]);
+    setInterestedCandidates([]);
+    setResumeReviewJob(null);
+    setResumeReviewQuery("");
+    setResumeReviewSort("職缺適配度");
+    setResumeGradeFilter("全部學歷");
+    setResumeSkillFilters([]);
+    setResumeFilterOpen(false);
+    setResumeProfileTalent(null);
+    setReviewResumeTalent(null);
+    setResumeAiOpen(false);
+    setJobEditorOpen(false);
+    setClosingJobTitle(null);
+    setCompanyProfile({ name: "Orbit 數位產品", bio: "招募團隊", avatar: "" });
+    setManagedJobQuery("");
+    setManagedJobSort("最新發布");
+    setNotice("企業端示範資料已重設");
+    window.setTimeout(() => setNotice(""), 2400);
+  }
+
+  function navigateEnterpriseGuide(target: string) {
+    if (target === "jobs" || target === "resumes" || target === "messages") {
+      setView(target);
+      if (target !== "resumes") setResumeReviewJob(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
   return (
     <main className="enterprise-shell">
       <aside className="enterprise-sidebar">
         <div className="brand">
           <span className="brand-mark">G</span>
           <span>GoodJob</span>
-          <button className="enterprise-guide-button" aria-label="企業版導覽" onClick={() => { setNotice("企業版導覽將在下一階段開放"); window.setTimeout(() => setNotice(""), 2400); }}>?</button>
+          <button className="enterprise-guide-button" aria-label="企業版導覽" onClick={() => setShowGuide(true)}>?</button>
         </div>
         <nav>
           <button
@@ -874,6 +918,7 @@ export default function EnterprisePortal({
         </div>
       )}
       {showCompanyEditor && <ProfileEditModal variant="company" profile={companyProfile} onClose={() => setShowCompanyEditor(false)} onSave={(profile) => { setCompanyProfile(profile); setShowCompanyEditor(false); setNotice("企業資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
+      {showGuide && <ProductGuide audience="business" onClose={() => setShowGuide(false)} onNavigate={navigateEnterpriseGuide} onReset={resetBusinessPrototype} />}
     </main>
   );
 }
