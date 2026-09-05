@@ -10,6 +10,7 @@ import EnterprisePortal from "./EnterprisePortal";
 import ProductGuide from "./ProductGuide";
 import ProfileEditModal, { type TalentProfile } from "./ProfileEditModal";
 import { writeEvidence } from "./ExperienceEvidence";
+import ChatWorkspace from "./ChatWorkspace";
 
 const navItems = [
   { label: "首頁" },
@@ -206,10 +207,13 @@ export default function Home() {
 
         <div className="sidebar-bottom">
           <button className="nav-item role-switch-button" onClick={() => setAudience(null)}><span className="nav-icon">⇄</span>切換展示身分</button>
-          <button className="profile-mini profile-mini-trigger" onClick={() => setShowProfileEditor(true)} aria-label="編輯個人資料">
-            <span className={profile.avatar ? "avatar has-image" : "avatar"} style={profile.avatar ? { backgroundImage: `url(${profile.avatar})` } : undefined}>{!profile.avatar && (profile.name.slice(-1) || "人")}</span>
-            <span><strong>{profile.name}</strong></span>
-          </button>
+          <div className="profile-mini-row">
+            <button className="profile-mini profile-mini-trigger" onClick={() => setShowProfileEditor(true)} aria-label="編輯個人資料">
+              <span className={profile.avatar ? "avatar has-image" : "avatar"} style={profile.avatar ? { backgroundImage: `url(${profile.avatar})` } : undefined}>{!profile.avatar && (profile.name.slice(-1) || "人")}</span>
+              <span><strong>{profile.name}</strong></span>
+            </button>
+            <button className={`profile-chat-button${activeView === "聊天室" ? " active" : ""}`} type="button" aria-label="開啟聊天室" onClick={() => { setActiveView("聊天室"); window.scrollTo({ top: 0, behavior: "smooth" }); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14v10H9l-4 3v-13Z" /><path d="M8.5 9h7M8.5 12h5" /></svg></button>
+          </div>
         </div>
       </aside>
 
@@ -315,6 +319,7 @@ export default function Home() {
           {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} />}
           {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} startInEditor={showGeneratedResumeEditor} onLibraryOpen={() => { setShowGeneratedResumeEditor(false); setResumeTarget(undefined); }} />}
           {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); setShowJobResumeFlow(true); }} />}
+          {activeView === "聊天室" && <ChatWorkspace audience="talent" />}
         </div>
       </section>
 
@@ -323,7 +328,7 @@ export default function Home() {
       {showJobResumeFlow && <ResumeBuilder key={`job-resume-${resumeTarget}`} experiences={experiences} initialTarget={resumeTarget} embedded onClose={() => { setShowJobResumeFlow(false); setResumeTarget(undefined); }} onGenerated={() => { setShowJobResumeFlow(false); setShowGeneratedResumeEditor(true); handleNavigation("我的履歷"); }} />}
       {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={handleNavigation} />}
       {showProfileEditor && <ProfileEditModal profile={profile} onClose={() => setShowProfileEditor(false)} onSave={(nextProfile) => { setProfile(nextProfile); setShowProfileEditor(false); setNotice("個人資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
-      <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"我的履歷",icon:"▤"},{label:"職缺探索",icon:"◎"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "我的履歷" ? "履歷" : item.label === "職缺探索" ? "探索" : item.label}</button>)}</nav>
+      <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"我的履歷",icon:"▤"},{label:"職缺探索",icon:"◎"},{label:"聊天室",icon:"▢"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => item.label === "聊天室" ? setActiveView("聊天室") : handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "我的履歷" ? "履歷" : item.label === "職缺探索" ? "探索" : item.label}</button>)}</nav>
     </main>
   );
 }

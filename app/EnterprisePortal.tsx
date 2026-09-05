@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProfileEditModal from "./ProfileEditModal";
+import ChatWorkspace from "./ChatWorkspace";
 
 type Talent = {
   id: number;
@@ -169,7 +170,10 @@ const talents: Talent[] = [
   },
 ];
 
-const candidateGrades = ["大四", "碩二", "大三", "應屆畢業", "碩一", "大四", "大三", "應屆畢業"];
+const candidateGrades = ["大二", "碩二", "大四", "大學畢業", "碩士畢業", "大三", "大一", "大學畢業"];
+const candidatePrograms = ["台大資管", "政大心理", "台科大工管", "北科大工設", "台大經濟", "輔大廣告", "政大企管", "成大企管"];
+const gradeOrder = ["大一", "大二", "大三", "大四", "大學畢業", "碩一", "碩二", "碩士畢業", "博士"];
+const gradeFilterOptions = ["大一以上", "大二以上", "大三以上", "大四以上", "碩一以上", "碩二以上", "博士以上", "大學畢業", "碩士畢業"];
 const candidateSubmittedAt = ["今天 09:42", "今天 08:15", "昨天 18:30", "昨天 14:05", "9 月 3 日", "9 月 2 日", "9 月 1 日", "8 月 31 日"];
 
 type PublicResume = {
@@ -228,6 +232,17 @@ function getPublicResumes(talent: Talent): PublicResume[] {
   ];
 }
 
+function ApplicantResumePaper({ talent, resume }: { talent: Talent; resume: PublicResume }) {
+  return <article className="pdf-resume-page applicant-resume-paper">
+    <header><div><h1>{talent.nickname}</h1><p>{talent.headline}</p></div><span>{talent.availability}</span></header>
+    <section><h2>PROFILE</h2><p>{resume.introduction}</p></section>
+    <section><h2>CORE SKILLS</h2><div className="pdf-skill-list">{talent.skills.map((item) => <span key={item}>{item}</span>)}</div></section>
+    <section><h2>EXPERIENCE</h2>{talent.experiences.map((item, index) => <article className="pdf-experience-entry" key={item}><header><strong>{item}</strong><span>{index === 0 ? "2025–2026" : "2025"}</span></header><small>{index === 0 ? talent.headline.split("｜")[0] : "專案核心成員"}</small><ul><li>{resume.bullets[index % resume.bullets.length]}</li><li>整合團隊回饋並將過程轉化為可追溯的成果與能力證據。</li></ul></article>)}</section>
+    <section><h2>EDUCATION</h2><p><strong>{talent.education}</strong> · 相關領域學習與專題經驗</p></section>
+    <footer><span>GoodJob 公開履歷</span><small>聯絡資料將於接受企業邀約後提供</small></footer>
+  </article>;
+}
+
 function getPublicExperiences(talent: Talent): PublicExperience[] {
   return talent.experiences.map((title, index) => ({
     id: `${talent.id}-experience-${index}`,
@@ -273,12 +288,37 @@ function requirementResult(talent: Talent, requirement: string, index: number) {
   };
 }
 
+function ResumeAiAnalysis({
+  talent,
+  resume,
+  job,
+  fit,
+  onClose,
+}: {
+  talent: Talent;
+  resume: PublicResume;
+  job: { title: string; requirements: string[]; bonusRequirements: string[] };
+  fit: number;
+  onClose: () => void;
+}) {
+  const requirementAnalysis = [
+    ...job.requirements.map((requirement) => ({ requirement, required: true })),
+    ...job.bonusRequirements.map((requirement) => ({ requirement, required: false })),
+  ].map((item, index) => ({ ...item, ...requirementResult(talent, item.requirement, index) }));
+  const suitableReasons = requirementAnalysis.filter((item) => item.level !== "missing");
+  const concerns = requirementAnalysis.filter((item) => item.level === "missing");
+  const verdict = fit >= 85 ? "高度適合" : fit >= 70 ? "適合" : fit >= 55 ? "部分適合" : "目前適合度較低";
+
+  return <div className="resume-ai-backdrop"><button className="resume-ai-backdrop-dismiss" type="button" aria-label="關閉 AI 履歷摘要" onClick={onClose} /><section className="resume-ai-modal" role="dialog" aria-modal="true" aria-labelledby="resume-ai-title"><header><div><span className="page-kicker">AI RESUME SUMMARY</span><h2 id="resume-ai-title">AI 履歷摘要</h2></div><button type="button" aria-label="關閉 AI 履歷摘要" onClick={onClose}>×</button></header><main><section className="resume-ai-overview"><div><span>應徵者</span><strong>{talent.nickname}</strong></div><div><span>應徵職位</span><strong>{job.title}</strong></div><div><span>整體適合度</span><strong>{fit}%</strong></div></section><section className="resume-ai-verdict"><h3>{verdict}</h3><p>綜合履歷中的技能、經驗成果與職缺條件，此候選人的整體適合度為 {fit}%。以下列出支持判斷的證據與仍需確認的落差。</p></section><section><h3>履歷摘要</h3><p>{resume.introduction}</p></section><section className="resume-ai-fit-section"><h3>適合此職缺的原因</h3>{suitableReasons.length ? <ul>{suitableReasons.map((item) => <li key={`${item.required}-${item.requirement}`}><strong>{item.requirement}</strong><span>{item.required ? "必備條件" : "加分條件"}</span><p>{item.evidence}</p></li>)}</ul> : <p>目前履歷中尚未找到能直接對應職缺條件的明確證據。</p>}</section><section className="resume-ai-gap-section"><h3>不適合或需確認的原因</h3>{concerns.length ? <ul>{concerns.map((item) => <li key={`${item.required}-${item.requirement}`}><strong>{item.requirement}</strong><span>{item.required ? "必備條件" : "加分條件"}</span><p>{item.required ? "履歷中尚未看到足以證明此項必備能力的具體經驗，可能影響上手速度。" : "履歷中未呈現此項加分能力，可在面談時確認是否具備相關經驗。"}</p></li>)}</ul> : <p>履歷已涵蓋目前列出的條件；仍建議於面談確認候選人的實際負責範圍與能力深度。</p>}</section><section className="resume-ai-note"><h3>面談建議</h3><p>優先針對尚無明確證據的條件提問，並請候選人說明具體情境、個人貢獻、決策方式與可量化成果。</p></section></main></section></div>;
+}
+
 export default function EnterprisePortal({
   onSwitchRole,
 }: {
   onSwitchRole: () => void;
 }) {
-  const [view, setView] = useState<"jobs" | "resumes">("jobs");
+  const [view, setView] = useState<"jobs" | "resumes" | "messages" | "talent">("jobs");
+  const [chatTalentName, setChatTalentName] = useState("Yulun");
   const [title, setTitle] = useState("Associate Product Manager");
   const [description, setDescription] = useState(
     "協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。",
@@ -301,6 +341,7 @@ export default function EnterprisePortal({
   const [experience, setExperience] = useState("全部年資");
   const [skill, setSkill] = useState("全部技能");
   const [aiSkills, setAiSkills] = useState<string[]>([]);
+  const [aiOpen, setAiOpen] = useState(false);
   const [selectedTalent, setSelectedTalent] = useState<Talent | null>(null);
   const [selectedResume, setSelectedResume] = useState<PublicResume | null>(
     null,
@@ -315,15 +356,19 @@ export default function EnterprisePortal({
   const [editingJob, setEditingJob] = useState<string | null>(null);
   const [closedJobs, setClosedJobs] = useState<string[]>([]);
   const [invited, setInvited] = useState<number[]>([]);
+  const [interestedCandidates, setInterestedCandidates] = useState<number[]>([]);
   const [resumeReviewJob, setResumeReviewJob] = useState<string | null>(null);
   const [resumeReviewQuery, setResumeReviewQuery] = useState("");
-  const [resumeReviewSort, setResumeReviewSort] = useState<"職缺適配度" | "最新投遞">("職缺適配度");
-  const [resumeGradeFilter, setResumeGradeFilter] = useState("全部年級");
-  const [resumeEducationFilter, setResumeEducationFilter] = useState("全部學歷");
+  const [resumeReviewSort, setResumeReviewSort] = useState<"職缺適配度" | "最新投遞" | "有興趣">("職缺適配度");
+  const [resumeGradeFilter, setResumeGradeFilter] = useState("全部學歷");
   const [resumeSkillFilters, setResumeSkillFilters] = useState<string[]>([]);
   const [resumeFilterOpen, setResumeFilterOpen] = useState(false);
   const [resumeProfileTalent, setResumeProfileTalent] = useState<Talent | null>(null);
-  const [savedResumeIds, setSavedResumeIds] = useState<string[]>([]);
+  const [reviewResumeTalent, setReviewResumeTalent] = useState<Talent | null>(null);
+  const [resumeAiOpen, setResumeAiOpen] = useState(false);
+  const [applicantResumeZoom, setApplicantResumeZoom] = useState(100);
+  const applicantResumeStageRef = useRef<HTMLElement | null>(null);
+  const applicantResumePaperRef = useRef<HTMLDivElement | null>(null);
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
   const [jobEditorOpen, setJobEditorOpen] = useState(false);
   const [closingJobTitle, setClosingJobTitle] = useState<string | null>(null);
@@ -379,6 +424,7 @@ export default function EnterprisePortal({
           : managedJobs.indexOf(a) - managedJobs.indexOf(b));
 
   const selectedReviewJob = managedJobs.find((job) => job.title === resumeReviewJob);
+  const applicantResume = reviewResumeTalent ? getPublicResumes(reviewResumeTalent)[0] : null;
   const reviewJobIndex = Math.max(0, managedJobs.findIndex((job) => job.title === resumeReviewJob));
   const reviewCandidates = talents
     .slice(0, Math.max(3, talents.length - reviewJobIndex * 2))
@@ -392,12 +438,18 @@ export default function EnterprisePortal({
     .filter(({ talent, grade }) => {
       const searchable = `${talent.nickname} ${talent.headline} ${talent.bio} ${talent.skills.join(" ")} ${talent.resume.join(" ")}`.toLowerCase();
       return searchable.includes(resumeReviewQuery.trim().toLowerCase())
-        && (resumeGradeFilter === "全部年級" || grade === resumeGradeFilter)
-        && (resumeEducationFilter === "全部學歷" || talent.education === resumeEducationFilter)
+        && (resumeGradeFilter === "全部學歷"
+          || grade === resumeGradeFilter
+          || (resumeGradeFilter.endsWith("以上")
+            && gradeOrder.indexOf(grade) >= gradeOrder.indexOf(resumeGradeFilter.replace("以上", ""))))
         && resumeSkillFilters.every((item) => talent.skills.includes(item));
     })
-    .sort((a, b) => resumeReviewSort === "最新投遞" ? a.submittedOrder - b.submittedOrder : b.fit - a.fit);
-  const resumeFilterCount = Number(resumeGradeFilter !== "全部年級") + Number(resumeEducationFilter !== "全部學歷") + resumeSkillFilters.length;
+    .sort((a, b) => resumeReviewSort === "最新投遞"
+      ? a.submittedOrder - b.submittedOrder
+      : resumeReviewSort === "有興趣"
+        ? Number(interestedCandidates.includes(b.talent.id)) - Number(interestedCandidates.includes(a.talent.id)) || b.fit - a.fit
+        : b.fit - a.fit);
+  const resumeFilterCount = Number(resumeGradeFilter !== "全部學歷") + resumeSkillFilters.length;
   const visibleTalents = talents
     .filter((talent) => {
       const text = `${talent.nickname} ${talent.headline} ${talent.bio} ${talent.skills.join(" ")}`.toLowerCase();
@@ -420,6 +472,37 @@ export default function EnterprisePortal({
       document.body.style.overflow = previousOverflow;
     };
   }, [closingJobTitle, jobEditorOpen, resumeFilterOpen, resumeProfileTalent, resumeReviewJob, selectedManagedJob]);
+
+  useEffect(() => {
+    const paper = applicantResumePaperRef.current;
+    if (!paper || !reviewResumeTalent) return;
+
+    const handleResumeZoom = (event: WheelEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const stage = applicantResumeStageRef.current;
+      if (!stage) return;
+      const nextZoom = Math.min(160, Math.max(60, applicantResumeZoom + (event.deltaY < 0 ? 10 : -10)));
+      if (nextZoom === applicantResumeZoom) return;
+
+      const paperRect = paper.getBoundingClientRect();
+      const pointerX = event.clientX - paperRect.left;
+      const pointerY = event.clientY - paperRect.top;
+      const ratio = nextZoom / applicantResumeZoom;
+      setApplicantResumeZoom(nextZoom);
+
+      window.requestAnimationFrame(() => {
+        const nextRect = paper.getBoundingClientRect();
+        stage.scrollLeft += nextRect.left + pointerX * ratio - event.clientX;
+        stage.scrollTop += nextRect.top + pointerY * ratio - event.clientY;
+      });
+    };
+
+    paper.addEventListener("wheel", handleResumeZoom, { passive: false });
+    return () => paper.removeEventListener("wheel", handleResumeZoom);
+  }, [applicantResumeZoom, reviewResumeTalent]);
 
   function publishJob() {
     if (!title.trim() || !description.trim() || !requirements.trim()) return;
@@ -481,6 +564,7 @@ export default function EnterprisePortal({
           >
             檢視履歷
           </button>
+          <button className={view === "messages" ? "active" : ""} onClick={() => setView("messages")}>聯繫人才</button>
         </nav>
         <div className="enterprise-sidebar-bottom">
           <button onClick={onSwitchRole}>⇄ 切換展示身分</button>
@@ -600,38 +684,50 @@ export default function EnterprisePortal({
           ) : view === "resumes" ? (
             <>
               {resumeReviewJob && selectedReviewJob ? (
+                reviewResumeTalent && applicantResume ? (
+                  <section className="enterprise-resume-workspace enterprise-applicant-resume page-enter">
+                    <header className="resume-workspace-header applicant-resume-header">
+                      <button className="resume-workspace-back" onClick={() => { setResumeAiOpen(false); setReviewResumeTalent(null); }}>← 返回履歷列表</button>
+                      <h1>{reviewResumeTalent.nickname}<span>應徵職位：{selectedReviewJob.title}</span></h1>
+                      <div className="applicant-resume-actions"><button className="ai-summary-button" type="button" onClick={() => setResumeAiOpen(true)}><span aria-hidden="true">✦</span>AI 摘要</button><button className={`talent-interest-button${interestedCandidates.includes(reviewResumeTalent.id) ? " active" : ""}`} type="button" onClick={() => setInterestedCandidates((current) => current.includes(reviewResumeTalent.id) ? current.filter((id) => id !== reviewResumeTalent.id) : [...current, reviewResumeTalent.id])}>{interestedCandidates.includes(reviewResumeTalent.id) ? "✓ 有興趣" : "有興趣"}</button><button type="button" onClick={() => { setChatTalentName(reviewResumeTalent.nickname); setView("messages"); setReviewResumeTalent(null); setResumeReviewJob(null); }}>聯絡此人才</button></div>
+                    </header>
+                    <main className="applicant-resume-stage" ref={applicantResumeStageRef}><div className="applicant-resume-zoom-layer" ref={applicantResumePaperRef} style={{ zoom: applicantResumeZoom / 100 }}><ApplicantResumePaper talent={reviewResumeTalent} resume={applicantResume} /></div><span className="applicant-resume-zoom-hint">Ctrl + 滾輪縮放 · {applicantResumeZoom}%</span></main>
+                    {resumeAiOpen && <ResumeAiAnalysis talent={reviewResumeTalent} resume={applicantResume} job={selectedReviewJob} fit={reviewCandidates.find(({ talent }) => talent.id === reviewResumeTalent.id)?.fit ?? reviewResumeTalent.fit} onClose={() => setResumeAiOpen(false)} />}
+                  </section>
+                ) : (
                 <section className="enterprise-resume-workspace page-enter">
                   <header className="resume-workspace-header">
-                    <div><span className="page-kicker">RECEIVED RESUMES</span><h1>{selectedReviewJob.title}</h1><p>目前收到 {reviewCandidates.length} 份履歷</p></div>
                     <button className="resume-workspace-back" onClick={() => { setResumeReviewJob(null); setResumeReviewQuery(""); }}>← 返回檢視履歷</button>
+                    <h1>{selectedReviewJob.title}<span>（{reviewCandidates.length} 份履歷）</span></h1>
+                    <div className="resume-review-toolbar">
+                      <label className="resume-review-search"><span>⌕</span><input value={resumeReviewQuery} onChange={(event) => setResumeReviewQuery(event.target.value)} placeholder="搜尋姓名、技能或履歷關鍵字" /></label>
+                      <button className={resumeFilterCount ? "active" : ""} onClick={() => setResumeFilterOpen(true)}>篩選{resumeFilterCount ? ` (${resumeFilterCount})` : ""}</button>
+                      <select aria-label="履歷排序方式" value={resumeReviewSort} onChange={(event) => setResumeReviewSort(event.target.value as "職缺適配度" | "最新投遞" | "有興趣")}><option>職缺適配度</option><option>最新投遞</option><option>有興趣</option></select>
+                    </div>
                   </header>
-                  <div className="resume-review-toolbar">
-                    <label className="resume-review-search"><span>⌕</span><input value={resumeReviewQuery} onChange={(event) => setResumeReviewQuery(event.target.value)} placeholder="搜尋姓名、技能或履歷關鍵字" /></label>
-                    <button className={resumeFilterCount ? "active" : ""} onClick={() => setResumeFilterOpen(true)}>篩選{resumeFilterCount ? ` (${resumeFilterCount})` : ""}</button>
-                    <select aria-label="履歷排序方式" value={resumeReviewSort} onChange={(event) => setResumeReviewSort(event.target.value as "職缺適配度" | "最新投遞")}><option>職缺適配度</option><option>最新投遞</option></select>
-                  </div>
-                  <div className="resume-review-results-heading"><strong>{reviewCandidates.length} 份履歷</strong><span>{resumeReviewSort === "職缺適配度" ? "依履歷內容與職缺適配度排序" : "依投遞時間由新到舊排序"}</span></div>
-                  {reviewCandidates.length ? <div className="received-resume-grid">{reviewCandidates.map(({ talent, grade, submittedAt, fit }) => {
-                    const saveKey = `${selectedReviewJob.title}-${talent.id}`;
-                    const isSaved = savedResumeIds.includes(saveKey);
+                    <div className="resume-review-panel-body">
+                      {reviewCandidates.length ? <div className="received-resume-grid">{reviewCandidates.map(({ talent, grade, submittedAt, fit }) => {
                     return <article className="received-resume-card" key={talent.id}>
-                      <header><button className="received-resume-avatar" aria-label={`查看 ${talent.nickname} 的自我介紹`} onClick={() => setResumeProfileTalent(talent)}>{talent.nickname.slice(0, 1)}</button><div><small>{submittedAt} 投遞</small><h2>{talent.headline.split("｜")[0]}</h2><p>{talent.nickname}</p></div><button className={`received-resume-save${isSaved ? " saved" : ""}`} aria-label={isSaved ? "取消收藏履歷" : "收藏履歷"} onClick={() => setSavedResumeIds((current) => current.includes(saveKey) ? current.filter((item) => item !== saveKey) : [...current, saveKey])}><span aria-hidden="true">♡</span>{isSaved ? "已收藏" : "收藏"}</button></header>
-                      <div className="received-resume-meta"><span>{grade}</span><span>{talent.education}</span><span>{talent.experience}</span><span>{talent.location}</span></div>
-                      <p>{talent.resume[0]}</p>
+                      <button className="received-resume-open" aria-label={`查看 ${talent.nickname} 的履歷`} onClick={() => { setApplicantResumeZoom(100); setReviewResumeTalent(talent); }} />
+                      <header><button className="received-resume-avatar" aria-label={`查看 ${talent.nickname} 的自我介紹`} onClick={() => setResumeProfileTalent(talent)}>{talent.nickname.slice(0, 1)}</button><div className="received-resume-identity"><div className="received-resume-name-line"><div className="received-resume-name"><h2>{talent.nickname}</h2></div><small className="received-resume-submitted">{submittedAt}</small></div><p>{candidatePrograms[talent.id - 1]} {grade}</p></div></header>
                       <div className="received-resume-skills">{talent.skills.map((item) => <span key={item}>{item}</span>)}</div>
-                      <footer><span>履歷內容與職缺適配度</span><strong>{fit}<small>%</small></strong></footer>
+                      <footer className="received-resume-footer"><div className="received-resume-fit"><span>適配度</span><strong>{fit}<small>%</small></strong></div><button className={interestedCandidates.includes(talent.id) ? "active" : ""} type="button" onClick={(event) => { event.stopPropagation(); setInterestedCandidates((current) => current.includes(talent.id) ? current.filter((id) => id !== talent.id) : [...current, talent.id]); }}>{interestedCandidates.includes(talent.id) ? "✓ 有興趣" : "有興趣"}</button></footer>
                     </article>;
-                  })}</div> : <div className="resume-review-empty"><span>⌕</span><h2>找不到符合條件的履歷</h2><button onClick={() => { setResumeReviewQuery(""); setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}>清除搜尋與篩選</button></div>}
+                      })}</div> : <div className="resume-review-empty"><span>⌕</span><h2>找不到符合條件的履歷</h2><button onClick={() => { setResumeReviewQuery(""); setResumeGradeFilter("全部學歷"); setResumeSkillFilters([]); }}>清除搜尋與篩選</button></div>}
+                    </div>
                 </section>
+                )
               ) : (
                 <section className="enterprise-resume-overview page-enter">
                   <header className="page-title-row"><div><span className="page-kicker">RESUME REVIEW</span><h1>檢視履歷</h1><p>依職缺查看目前收到的履歷與適配排序。</p></div></header>
-                  <div className="resume-job-grid">{managedJobs.map((job, index) => <button key={job.title} onClick={() => { setResumeReviewJob(job.title); setResumeReviewQuery(""); setResumeReviewSort("職缺適配度"); setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}><header><span className="company-job-logo">O</span><div><small>Orbit 數位產品</small><strong>{job.title}</strong></div><em>{job.status}</em></header><div className="resume-job-count"><strong>{Math.max(3, talents.length - index * 2)}</strong><span>份履歷</span></div><footer><span>最新投遞：{candidateSubmittedAt[Math.min(index, candidateSubmittedAt.length - 1)]}</span><b>查看履歷 →</b></footer></button>)}</div>
+                  <div className="resume-job-grid">{managedJobs.map((job, index) => <button key={job.title} onClick={() => { setResumeReviewJob(job.title); setResumeReviewQuery(""); setResumeReviewSort("職缺適配度"); setResumeGradeFilter("全部學歷"); setResumeSkillFilters([]); }}><header><span className="company-job-logo">O</span><div><strong>{job.title}</strong></div></header><div className="resume-job-count"><div><strong>{Math.max(3, talents.length - index * 2)}</strong><span>份履歷</span></div><small>最新投遞：{candidateSubmittedAt[Math.min(index, candidateSubmittedAt.length - 1)]}</small></div></button>)}</div>
                 </section>
               )}
-              {resumeFilterOpen && <div className="enterprise-resume-filter-backdrop"><section className="enterprise-resume-filter-modal" role="dialog" aria-modal="true" aria-labelledby="resume-filter-title"><header><div><span className="page-kicker">FILTER RESUMES</span><h2 id="resume-filter-title">篩選履歷</h2></div><button aria-label="關閉篩選" onClick={() => setResumeFilterOpen(false)}>×</button></header><main><label><span>年級</span><select value={resumeGradeFilter} onChange={(event) => setResumeGradeFilter(event.target.value)}><option>全部年級</option>{[...new Set(candidateGrades)].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>學歷</span><select value={resumeEducationFilter} onChange={(event) => setResumeEducationFilter(event.target.value)}><option>全部學歷</option>{[...new Set(talents.map((item) => item.education))].map((item) => <option key={item}>{item}</option>)}</select></label><fieldset><legend>具備技能</legend><div>{[...new Set(talents.flatMap((item) => item.skills))].sort().map((item) => <label key={item}><input type="checkbox" checked={resumeSkillFilters.includes(item)} onChange={() => setResumeSkillFilters((current) => current.includes(item) ? current.filter((skill) => skill !== item) : [...current, item])} /><span>{item}</span></label>)}</div></fieldset></main><footer><button onClick={() => { setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}>清除全部</button><button className="primary-flow-button" onClick={() => setResumeFilterOpen(false)}>套用篩選</button></footer></section></div>}
-              {resumeProfileTalent && <div className="resume-candidate-profile-backdrop"><section className="resume-candidate-profile" role="dialog" aria-modal="true" aria-labelledby="resume-candidate-name"><header><span className="received-resume-avatar">{resumeProfileTalent.nickname.slice(0, 1)}</span><div><span>履歷投遞者</span><h2 id="resume-candidate-name">{resumeProfileTalent.nickname}</h2><p>{resumeProfileTalent.headline}</p></div><button aria-label="關閉投遞者資料" onClick={() => setResumeProfileTalent(null)}>×</button></header><main><h3>自我介紹</h3><p>{resumeProfileTalent.bio}</p></main></section></div>}
+              {resumeFilterOpen && <div className="enterprise-resume-filter-backdrop"><section className="enterprise-resume-filter-modal" role="dialog" aria-modal="true" aria-labelledby="resume-filter-title"><header><div><span className="page-kicker">FILTER RESUMES</span><h2 id="resume-filter-title">篩選履歷</h2></div><button aria-label="關閉篩選" onClick={() => setResumeFilterOpen(false)}>×</button></header><main><label className="resume-education-filter"><span>學歷</span><select value={resumeGradeFilter} onChange={(event) => setResumeGradeFilter(event.target.value)}><option>全部學歷</option>{gradeFilterOptions.map((item) => <option key={item}>{item}</option>)}</select></label><fieldset><legend>具備技能</legend><div>{[...new Set(talents.flatMap((item) => item.skills))].sort().map((item) => <label key={item}><input type="checkbox" checked={resumeSkillFilters.includes(item)} onChange={() => setResumeSkillFilters((current) => current.includes(item) ? current.filter((skill) => skill !== item) : [...current, item])} /><span>{item}</span></label>)}</div></fieldset></main><footer><button onClick={() => { setResumeGradeFilter("全部學歷"); setResumeSkillFilters([]); }}>清除全部</button><button className="primary-flow-button" onClick={() => setResumeFilterOpen(false)}>套用篩選</button></footer></section></div>}
+              {resumeProfileTalent && <div className="resume-candidate-profile-backdrop"><section className="resume-candidate-profile" role="dialog" aria-modal="true" aria-labelledby="resume-candidate-name"><header><span className="received-resume-avatar">{resumeProfileTalent.nickname.slice(0, 1)}</span><div><h2 id="resume-candidate-name">{resumeProfileTalent.nickname}</h2></div><button aria-label="關閉投遞者資料" onClick={() => setResumeProfileTalent(null)}>×</button></header><main><h3>自我介紹</h3><p>{resumeProfileTalent.bio}</p></main></section></div>}
             </>
+          ) : view === "messages" ? (
+            <ChatWorkspace audience="business" initialContact={chatTalentName} />
           ) : (
             <section className="enterprise-talent-page page-enter">
               <header className="page-title-row">
