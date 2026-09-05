@@ -4,7 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import type { NewExperience } from "./ExperienceFlow";
 import ExperienceEvidence, { readEvidence, type EvidenceItem } from "./ExperienceEvidence";
 
-type Props = { experiences: NewExperience[]; onAdd: () => void };
+type Props = {
+  experiences: NewExperience[];
+  onAdd: () => void;
+  onUpdate: (original: NewExperience, updated: NewExperience) => void;
+};
+
+const existingResumes = [
+  { id: "orbit-apm", title: "Associate Product Manager", company: "Orbit 數位產品", template: "ATS 專業版" },
+  { id: "daily-ux", title: "UX Research Assistant", company: "日日生活科技", template: "專案導向版" },
+  { id: "general", title: "通用求職履歷", company: "未指定職缺", template: "ATS 專業版" },
+];
 
 const typeFilterTone: Record<string, string> = {
   "全部": "all",
@@ -19,7 +29,7 @@ const typeFilterTone: Record<string, string> = {
   "其他": "other",
 };
 
-export default function ExperienceLibrary({ experiences, onAdd }: Props) {
+export default function ExperienceLibrary({ experiences, onAdd, onUpdate }: Props) {
   const [view, setView] = useState<"cards" | "timeline">("cards");
   const [type, setType] = useState("全部");
   const [query, setQuery] = useState("");
@@ -27,9 +37,17 @@ export default function ExperienceLibrary({ experiences, onAdd }: Props) {
   const [isClosingDetail, setIsClosingDetail] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
   const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
+  const [editDraft, setEditDraft] = useState<NewExperience | null>(null);
+  const [showResumePicker, setShowResumePicker] = useState(false);
+  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [resumeNotice, setResumeNotice] = useState("");
 
   function openExperience(item: NewExperience) {
     setIsClosingDetail(false);
+    setEditDraft(null);
+    setShowResumePicker(false);
+    setSelectedResumeId("");
+    setResumeNotice("");
     setSelected(item);
     setEvidenceItems(readEvidence()[item.title] || []);
   }
@@ -38,10 +56,34 @@ export default function ExperienceLibrary({ experiences, onAdd }: Props) {
     if (!selected || isClosingDetail) return;
     setIsClosingDetail(true);
     setShowEvidence(false);
+    setEditDraft(null);
+    setShowResumePicker(false);
     window.setTimeout(() => {
       setSelected(null);
       setIsClosingDetail(false);
     }, 250);
+  }
+
+  function saveEditedExperience() {
+    if (!selected || !editDraft?.title.trim() || !editDraft.org.trim() || !editDraft.description.trim()) return;
+    const updated = { ...editDraft, title: editDraft.title.trim(), org: editDraft.org.trim(), description: editDraft.description.trim(), tags: editDraft.tags.filter(Boolean) };
+    onUpdate(selected, updated);
+    setSelected(updated);
+    setEditDraft(null);
+  }
+
+  function addToExistingResume() {
+    if (!selected || !selectedResumeId) return;
+    const storageKey = "goodjob-resume-experience-links-v1";
+    let links: Record<string, string[]> = {};
+    try { links = JSON.parse(window.localStorage.getItem(storageKey) || "{}"); } catch { links = {}; }
+    links[selectedResumeId] = [...new Set([...(links[selectedResumeId] || []), selected.title])];
+    window.localStorage.setItem(storageKey, JSON.stringify(links));
+    const resume = existingResumes.find((item) => item.id === selectedResumeId);
+    setShowResumePicker(false);
+    setSelectedResumeId("");
+    setResumeNotice(`已加入「${resume?.title || "履歷"}」`);
+    window.setTimeout(() => setResumeNotice(""), 2400);
   }
 
   useEffect(() => {
@@ -112,18 +154,42 @@ export default function ExperienceLibrary({ experiences, onAdd }: Props) {
         </div>
       )}
 
-      {selected && <div className={`detail-backdrop${isClosingDetail ? " closing" : ""}`} onMouseDown={(event) => event.target === event.currentTarget && closeExperience()}>
+      {selected && <div className={`detail-backdrop${isClosingDetail ? " closing" : ""}`}>
         <aside className="experience-detail" role="dialog" aria-modal="true" aria-label={`${selected.title} 詳情`}>
           <header><div className="detail-header-copy"><div className="detail-header-meta"><span className={`type-badge experience-type-${typeFilterTone[selected.type] ?? "other"}`}>{selected.type === "工作" ? "正職" : selected.type}</span><small>{selected.date}</small></div><div className="detail-header-title"><span>{selected.org}</span><strong>{selected.title}</strong></div></div><button onClick={closeExperience} aria-label="關閉詳情">×</button></header>
-          <div className="detail-body">
+          {editDraft ? <div className="detail-body experience-edit-body">
+            <div className="experience-edit-grid">
+              <label><span>經驗類型</span><select value={editDraft.type} onChange={(event) => setEditDraft({ ...editDraft, type: event.target.value })}>{["正職", "實習", "修課", "專案", "競賽", "社團", "研究", "其他"].map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label><span>日期</span><input value={editDraft.date} onChange={(event) => setEditDraft({ ...editDraft, date: event.target.value })} /></label>
+            </div>
+            <label><span>經驗名稱 <b>必填</b></span><input value={editDraft.title} onChange={(event) => setEditDraft({ ...editDraft, title: event.target.value })} /></label>
+            <label><span>組織名稱 <b>必填</b></span><input value={editDraft.org} onChange={(event) => setEditDraft({ ...editDraft, org: event.target.value })} /></label>
+            <label><span>經驗敘述 <b>必填</b></span><textarea value={editDraft.description} onChange={(event) => setEditDraft({ ...editDraft, description: event.target.value })} /></label>
+            <label><span>技能標籤 <small>以逗號分隔</small></span><input value={editDraft.tags.join("、")} onChange={(event) => setEditDraft({ ...editDraft, tags: event.target.value.split(/[、,，]/).map((tag) => tag.trim()) })} /></label>
+            <section className="experience-edit-evidence">
+              <header><div><strong>成果與附件</strong><small>加入簡報、報告或獎狀，補充這段經驗的證據</small></div><button type="button" onClick={() => setShowEvidence(true)}>＋ 加入成果</button></header>
+              {evidenceItems.length ? <div className="detail-evidence-list">{evidenceItems.slice(0, 3).map((item) => <button type="button" key={item.id} onClick={() => setShowEvidence(true)}><span>{item.type.includes("獎") ? "◇" : item.type.includes("簡報") ? "▤" : "≡"}</span><div><strong>{item.name}</strong><small>{item.type} · 已納入技能分析</small></div><b>✓</b></button>)}</div> : <button type="button" className="experience-edit-evidence-empty" onClick={() => setShowEvidence(true)}><span>＋</span><div><strong>尚無成果附件</strong><small>點擊加入第一項成果</small></div></button>}
+            </section>
+          </div> : <div className="detail-body">
             <section><h3>經驗結構</h3><dl><div><dt>項目背景</dt><dd>團隊需要在有限時間內理解使用者需求，並提出可落地的改善方案。</dd></div><div><dt>我的角色</dt><dd>負責研究規劃、洞察整理與提案溝通。</dd></div><div><dt>主要行動</dt><dd>規劃訪談、整理問題模式，並將發現轉化為具體設計方向。</dd></div><div><dt>具體成果</dt><dd>{selected.description}</dd></div></dl></section>
             <section><h3>技能與證據</h3><div className="detail-skills">{selected.tags.map((tag) => <span key={tag}><b>✓</b>{tag}<small>有經驗支持</small></span>)}</div></section>
-            <section className="detail-evidence-section"><div><h3>成果與附件</h3><button onClick={() => setShowEvidence(true)}>＋ 加入成果</button></div>{evidenceItems.length ? <div className="detail-evidence-list">{evidenceItems.slice(0,3).map((item) => <button key={item.id} onClick={() => setShowEvidence(true)}><span>{item.type.includes("獎") ? "◇" : item.type.includes("簡報") ? "▤" : "≡"}</span><div><strong>{item.name}</strong><small>{item.type} · 已納入技能分析</small></div><b>✓</b></button>)}</div> : <div className="detail-evidence-empty"><span>▤</span><div><strong>尚無成果附件</strong><small>加入成果，讓能力與成果有更多可追溯證據</small></div></div>}</section>
+            <section className="detail-evidence-section"><div><h3>成果與附件</h3></div>{evidenceItems.length ? <div className="detail-evidence-list">{evidenceItems.slice(0,3).map((item) => <button key={item.id} onClick={() => setShowEvidence(true)}><span>{item.type.includes("獎") ? "◇" : item.type.includes("簡報") ? "▤" : "≡"}</span><div><strong>{item.name}</strong><small>{item.type} · 已納入技能分析</small></div><b>✓</b></button>)}</div> : <div className="detail-evidence-empty"><span>▤</span><div><strong>尚無成果附件</strong><small>加入成果，讓能力與成果有更多可追溯證據</small></div></div>}</section>
             <section className="detail-output"><div className="detail-output-heading"><h3>履歷敘述</h3><small>這段文字只根據已確認內容整理</small></div><p>• {selected.description}</p></section>
-          </div>
-          <footer><button>編輯經驗</button><button className="primary-flow-button">加入履歷</button></footer>
+          </div>}
+          {editDraft
+            ? <footer><button onClick={() => setEditDraft(null)}>取消</button><button className="primary-flow-button" disabled={!editDraft.title.trim() || !editDraft.org.trim() || !editDraft.description.trim()} onClick={saveEditedExperience}>儲存變更</button></footer>
+            : <footer><button onClick={() => setEditDraft({ ...selected, tags: [...selected.tags] })}>編輯經驗</button><button className="primary-flow-button" onClick={() => { setSelectedResumeId(""); setShowResumePicker(true); }}>加入履歷</button></footer>}
         </aside>
       </div>}
+      {selected && showResumePicker && <div className="experience-resume-picker-backdrop">
+        <button className="experience-resume-picker-dismiss" aria-label="關閉加入履歷視窗" onClick={() => setShowResumePicker(false)} />
+        <section className="experience-resume-picker" role="dialog" aria-modal="true" aria-labelledby="resume-picker-title">
+          <header><div><small>ADD TO RESUME</small><h2 id="resume-picker-title">加入履歷</h2></div><button aria-label="關閉" onClick={() => setShowResumePicker(false)}>×</button></header>
+          <div className="experience-resume-picker-body"><p>選擇要加入的既有履歷</p><div className="experience-resume-options">{existingResumes.map((resume) => <button className={selectedResumeId === resume.id ? "selected" : ""} key={resume.id} onClick={() => setSelectedResumeId(resume.id)}><span>{selectedResumeId === resume.id ? "✓" : ""}</span><div><strong>{resume.title}</strong><small>{resume.company} · {resume.template}</small></div></button>)}</div></div>
+          <footer><button onClick={() => setShowResumePicker(false)}>取消</button><button className="primary-flow-button" disabled={!selectedResumeId} onClick={addToExistingResume}>加入履歷</button></footer>
+        </section>
+      </div>}
+      {resumeNotice && <div className="experience-resume-notice" role="status"><span>✓</span>{resumeNotice}</div>}
       {selected && showEvidence && <ExperienceEvidence experience={selected} onClose={() => setShowEvidence(false)} onSaved={setEvidenceItems} />}
     </section>
   );

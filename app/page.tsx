@@ -316,7 +316,7 @@ export default function Home() {
 
           </section>
           </div>}
-          {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} />}
+          {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} onUpdate={(original, updated) => setExperiences((current) => current.map((item) => item === original ? updated : item))} />}
           {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} startInEditor={showGeneratedResumeEditor} onLibraryOpen={() => { setShowGeneratedResumeEditor(false); setResumeTarget(undefined); }} />}
           {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); setShowJobResumeFlow(true); }} />}
           {activeView === "聊天室" && <ChatWorkspace audience="talent" />}

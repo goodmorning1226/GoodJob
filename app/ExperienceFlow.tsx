@@ -37,6 +37,9 @@ const resultSkillGroups = {
   "領域知識": ["校園服務"],
 } as const;
 
+type SkillGroup = keyof typeof resultSkillGroups;
+type AddedSkill = { name: string; group: SkillGroup; status: "certified" | "questionable" };
+
 export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [step, setStep] = useState(1);
   const [analysisTarget, setAnalysisTarget] = useState<2 | 4 | null>(null);
@@ -67,6 +70,11 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [researchTitle, setResearchTitle] = useState("");
   const [schemaAnalysis, setSchemaAnalysis] = useState<ExperienceSchemaResult[]>([]);
   const [schemaAnswers, setSchemaAnswers] = useState<Partial<Record<ExperienceSchemaKey, string>>>({});
+  const [addedSkills, setAddedSkills] = useState<AddedSkill[]>([]);
+  const [skillModalStep, setSkillModalStep] = useState<"closed" | "category" | "input" | "analyzing">("closed");
+  const [newSkillGroup, setNewSkillGroup] = useState<SkillGroup | null>(null);
+  const [newSkillName, setNewSkillName] = useState("");
+  const [skillNotice, setSkillNotice] = useState("");
   const attachmentInput = useRef<HTMLInputElement>(null);
   const flowShell = useRef<HTMLDivElement>(null);
 
@@ -114,7 +122,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
       title: type === "修課" ? courseName : isEmployment ? positionName : isCompetition ? competitionName : type === "專案" ? projectTitle : isClub ? clubPosition : type === "研究" ? researchTitle : "校園二手書交換服務設計",
       org: type === "修課" ? courseOrg + " · " + courseTerm : isEmployment ? companyName : isCompetition ? competitionOrg : isClub ? clubName : type === "研究" ? "研究經驗" : "服務設計課程專案",
       description: resumeOutputs["標準版"] || summary,
-      tags: ["使用者研究", "Figma", "流程優化"],
+      tags: [...new Set(["使用者研究", "Figma", "流程優化", ...addedSkills.map((skill) => skill.name)])],
       color: "#3b78a0",
       completeness: schemaCompleteness,
       schema: savedSchema,
@@ -173,6 +181,33 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
     setSchemaAnalysis(analysis);
     setSchemaAnswers({});
     setAnalysisTarget(2);
+  }
+
+  function openSkillModal() {
+    setNewSkillGroup(null);
+    setNewSkillName("");
+    setSkillModalStep("category");
+  }
+
+  function analyzeAndAddSkill() {
+    const name = newSkillName.trim();
+    if (!name || !newSkillGroup) return;
+    const alreadyExists = [...Object.values(resultSkillGroups).flat(), ...addedSkills.map((skill) => skill.name)]
+      .some((skill) => skill.toLowerCase() === name.toLowerCase());
+    if (alreadyExists) {
+      setSkillNotice("這項技能已在技能面板中");
+      return;
+    }
+    setSkillNotice("");
+    setSkillModalStep("analyzing");
+    window.setTimeout(() => {
+      const evidenceText = `${story} ${summary} ${resumeOutputs["標準版"]} ${attachments.map((item) => `${item.name} ${item.type}`).join(" ")}`.toLowerCase();
+      const status = evidenceText.includes(name.toLowerCase()) ? "certified" : "questionable";
+      setAddedSkills((current) => [...current, { name, group: newSkillGroup, status }]);
+      setSkillModalStep("closed");
+      setSkillNotice(status === "certified" ? `「${name}」已有內容佐證，已標註為認證` : `「${name}」目前佐證不足，已標註為有疑慮`);
+      window.setTimeout(() => setSkillNotice(""), 3000);
+    }, 900);
   }
 
   function finishClarification() {
@@ -337,9 +372,12 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
 
               <aside className="result-side">
                 <article className="result-card skill-card">
-                  <div className="result-card-title"><span>提取技能</span><button className="add-skill-button">＋ 新增技能</button></div>
+                  <div className="result-card-title"><span>提取技能</span><button className="add-skill-button" onClick={openSkillModal}>＋ 新增技能</button></div>
                   <div className="skill-chips">
-                    <div className="result-skill-table">{Object.entries(resultSkillGroups).map(([group, skills]) => <div className="result-skill-row" key={group}><strong>{group}</strong><div>{skills.map((skill) => <span key={skill}>{skill} <b>{skill === "團隊協作" ? "?" : "✓"}</b></span>)}</div></div>)}</div>
+                    <div className="result-skill-table">{Object.entries(resultSkillGroups).map(([group, skills]) => {
+                      const customSkills = addedSkills.filter((skill) => skill.group === group);
+                      return <div className="result-skill-row" key={group}><strong>{group}</strong><div>{skills.map((skill) => <span key={skill}>{skill}<b className="certified" aria-label="已認證" title="已認證">✓</b></span>)}{customSkills.map((skill) => <span className="newly-added" key={skill.name}>{skill.name}<b className={skill.status} aria-label={skill.status === "certified" ? "已認證" : "有疑慮"} title={skill.status === "certified" ? "已認證" : "有疑慮"}>{skill.status === "certified" ? "✓" : "?"}</b></span>)}</div></div>;
+                    })}</div>
                   </div>
                 </article>
                 <article className="result-card source-card"><div><strong>事實來源完整</strong><p>{attachments.length ? `角色與成果由原始描述及 ${attachments.length} 份附件共同支持。` : "角色、方法與成果都有原始描述支持。團隊協作仍需要更多細節。"}</p></div></article>
@@ -365,6 +403,17 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
           </section>
         )}
       </div>
+      {skillModalStep !== "closed" && <div className="add-skill-modal-backdrop">
+        <button className="modal-backdrop-dismiss" aria-label="關閉新增技能視窗" onClick={() => setSkillModalStep("closed")} />
+        <section className="add-skill-modal" role="dialog" aria-modal="true" aria-labelledby="add-skill-title">
+          <header><div><span className="flow-kicker">ADD A SKILL</span><h2 id="add-skill-title">新增技能</h2></div><button aria-label="關閉新增技能視窗" onClick={() => setSkillModalStep("closed")}>×</button></header>
+          {skillModalStep === "category" && <main><p>先選擇技能類型</p><div className="add-skill-category-grid">{(Object.keys(resultSkillGroups) as SkillGroup[]).map((group) => <button key={group} onClick={() => { setNewSkillGroup(group); setSkillModalStep("input"); }}><span>{group === "核心能力" ? "◇" : group === "工具技能" ? "⌘" : "◎"}</span><div><strong>{group}</strong><small>{group === "核心能力" ? "工作方法、溝通與執行能力" : group === "工具技能" ? "軟體、平台或實作工具" : "產業、情境與專業知識"}</small></div><b>→</b></button>)}</div></main>}
+          {skillModalStep === "input" && <main><button className="add-skill-back" onClick={() => { setSkillNotice(""); setSkillModalStep("category"); }}>← 重新選擇類型</button><div className="selected-skill-category"><span>技能類型</span><strong>{newSkillGroup}</strong></div><label><span>技能名稱</span><input value={newSkillName} placeholder="輸入一項技能" onChange={(event) => { setNewSkillName(event.target.value); setSkillNotice(""); }} onKeyDown={(event) => { if (event.key === "Enter") analyzeAndAddSkill(); }} /></label>{skillNotice && <p className="add-skill-warning">{skillNotice}</p>}</main>}
+          {skillModalStep === "analyzing" && <main className="add-skill-analyzing"><span className="analysis-loader" aria-hidden="true" /><h3>AI 正在判斷技能證據</h3><p>比對經驗描述、整理結果與成果附件</p></main>}
+          {skillModalStep !== "analyzing" && <footer><button onClick={() => setSkillModalStep("closed")}>取消</button>{skillModalStep === "input" && <button className="primary-flow-button" disabled={!newSkillName.trim()} onClick={analyzeAndAddSkill}>交給 AI 判斷 ✦</button>}</footer>}
+        </section>
+      </div>}
+      {skillNotice && skillModalStep === "closed" && <div className="skill-analysis-notice" role="status">{skillNotice}</div>}
     </div>
   );
 }
