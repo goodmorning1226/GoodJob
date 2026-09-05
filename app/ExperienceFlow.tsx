@@ -47,9 +47,6 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [competitionStartDate, setCompetitionStartDate] = useState("2026-02-01");
   const [competitionEndDate, setCompetitionEndDate] = useState("2026-06-30");
   const [story, setStory] = useState(incompleteStoryExample);
-  const [role, setRole] = useState("負責使用者訪談、問題整理與互動原型設計");
-  const [tools, setTools] = useState("半結構式訪談、Figma、可用性測試");
-  const [impact, setImpact] = useState("測試 8 位使用者，將交換流程由 7 步縮短至 4 步");
   const [summary, setSummary] = useState("主導校園二手書交換流程的使用者研究與原型設計，透過 8 位使用者測試，將核心交換流程由 7 步精簡至 4 步。");
   const [resumeOutputs, setResumeOutputs] = useState<Record<string, string>>({
     "精簡版": "重新設計校園二手書交換流程，透過使用者測試將完成步驟由 7 步縮短至 4 步。",
@@ -71,6 +68,7 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const [schemaAnalysis, setSchemaAnalysis] = useState<ExperienceSchemaResult[]>([]);
   const [schemaAnswers, setSchemaAnswers] = useState<Partial<Record<ExperienceSchemaKey, string>>>({});
   const attachmentInput = useRef<HTMLInputElement>(null);
+  const flowShell = useRef<HTMLDivElement>(null);
 
   function closeFlow() {
     if (isClosing) return;
@@ -86,6 +84,11 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [analysisTarget]);
+
+  useEffect(() => {
+    const scrollArea = flowShell.current?.querySelector<HTMLElement>(".flow-content, .processing-step");
+    if (scrollArea) scrollArea.scrollTop = 0;
+  }, [analysisTarget, step]);
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -150,9 +153,6 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
     const nextTools = [schemaValue(analysis, answers, "action"), schemaValue(analysis, answers, "method")].filter((item, index, items) => item && items.indexOf(item) === index).join("；");
     const nextImpact = [schemaValue(analysis, answers, "result"), schemaValue(analysis, answers, "evidence")].filter((item, index, items) => item && items.indexOf(item) === index).join("；");
     const nextSummary = buildStructuredSummary(analysis, answers);
-    if (nextRole) setRole(nextRole);
-    if (nextTools) setTools(nextTools);
-    if (nextImpact) setImpact(nextImpact);
     if (nextSummary) {
       setSummary(nextSummary);
       const concise = [nextRole, nextImpact].filter(Boolean).join("；");
@@ -203,8 +203,9 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
   const visibleStep = analysisTarget === 2 ? 2 : analysisTarget === 4 || step >= 3 ? 3 : step;
 
   return (
-    <div className={`flow-overlay${isClosing ? " closing" : ""}`} role="dialog" aria-modal="true" aria-label="新增經驗" onMouseDown={(event) => event.target === event.currentTarget && closeFlow()}>
-      <div className="flow-shell">
+    <div className={`flow-overlay${isClosing ? " closing" : ""}`} role="dialog" aria-modal="true" aria-label="新增經驗">
+      <button className="modal-backdrop-dismiss" aria-label="關閉新增經驗" onClick={closeFlow} />
+      <div className="flow-shell" ref={flowShell}>
         <header className="flow-header">
           <div className="flow-brand"><span className="brand-mark">G</span><span>新增一段經驗</span></div>
           <div className="stepper" aria-label={`步驟 ${visibleStep}，共 3 步`}>
@@ -237,8 +238,8 @@ export default function ExperienceFlow({ onClose, onComplete }: Props) {
 
             <div className="capture-card">
               <div className="field-row">
-                <label>這是什麼類型的經驗？</label>
-                <select value={type} onChange={(event) => setType(event.target.value)}>
+                <label htmlFor="experience-type">這是什麼類型的經驗？</label>
+                <select id="experience-type" value={type} onChange={(event) => setType(event.target.value)}>
                   <option>專案</option><option>修課</option><option>實習</option><option value="工作">正職</option><option>競賽</option><option>社團</option><option>研究</option>
                 </select>
               </div>

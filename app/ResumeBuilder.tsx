@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { NewExperience } from "./ExperienceFlow";
 
-type Props = { experiences: NewExperience[]; initialTarget?: string };
+type Props = { experiences: NewExperience[]; initialTarget?: string; embedded?: boolean; startInEditor?: boolean; onClose?: () => void; onGenerated?: () => void; onLibraryOpen?: () => void; onSaved?: () => void };
 type Template = "ats" | "project" | "impact";
 type TargetMode = "specific" | "general";
 
@@ -50,9 +50,9 @@ const jobCatalog: Record<string, { title: string; company: string; fit: number }
   ],
 };
 
-export default function ResumeBuilder({ experiences, initialTarget }: Props) {
-  const [mode, setMode] = useState<"library" | "wizard" | "editor">(initialTarget ? "wizard" : "library");
-  const [wizardStep, setWizardStep] = useState(initialTarget ? 2 : 1);
+export default function ResumeBuilder({ experiences, initialTarget, embedded = false, startInEditor = false, onClose, onGenerated, onLibraryOpen, onSaved }: Props) {
+  const [mode, setMode] = useState<"library" | "wizard" | "editor">(startInEditor ? "editor" : initialTarget ? "wizard" : "library");
+  const [wizardStep, setWizardStep] = useState(1);
   const [template, setTemplate] = useState<Template>("ats");
   const [language, setLanguage] = useState("繁體中文");
   const [pageCount, setPageCount] = useState("1 頁");
@@ -66,13 +66,14 @@ export default function ResumeBuilder({ experiences, initialTarget }: Props) {
   const [activePanel, setActivePanel] = useState<"content" | "design">("content");
   const [exported, setExported] = useState(false);
   const [saved, setSaved] = useState(true);
+  const [resumeTitle, setResumeTitle] = useState("自訂標題......");
   const [resumeZoom, setResumeZoom] = useState(85);
   const [resumePageHeight, setResumePageHeight] = useState(A4_HEIGHT);
   const [generating, setGenerating] = useState(false);
   const [targetMode, setTargetMode] = useState<TargetMode>(initialTarget ? "specific" : "general");
   const [selectedField, setSelectedField] = useState("");
   const [fieldQuery, setFieldQuery] = useState("");
-  const [jobQuery, setJobQuery] = useState("");
+  const [jobQuery, setJobQuery] = useState(initialTarget || "");
   const [inferredJobTags, setInferredJobTags] = useState<string[]>([]);
   const [customJobTags, setCustomJobTags] = useState<string[]>([]);
   const [newJobTag, setNewJobTag] = useState("");
@@ -88,7 +89,13 @@ export default function ResumeBuilder({ experiences, initialTarget }: Props) {
   const resumeZoomArea = useRef<HTMLDivElement>(null);
   const resumePaper = useRef<HTMLDivElement>(null);
   const resumeTitleInput = useRef<HTMLInputElement>(null);
+  const wizardContent = useRef<HTMLDivElement>(null);
   const pendingZoomAnchor = useRef<{ clientX: number; clientY: number; localX: number; localY: number; nextZoom: number } | null>(null);
+
+  useEffect(() => {
+    if (mode !== "wizard" || generating) return;
+    if (wizardContent.current) wizardContent.current.scrollTop = 0;
+  }, [generating, mode, wizardStep]);
 
   useEffect(() => {
     if (mode !== "editor" || window.matchMedia("(max-width: 760px)").matches) return;
@@ -267,12 +274,34 @@ export default function ResumeBuilder({ experiences, initialTarget }: Props) {
 
   function generateResume() {
     setGenerating(true);
-    window.setTimeout(() => { setGenerating(false); setMode("editor"); setSaved(true); }, 1150);
+    window.setTimeout(() => {
+      setGenerating(false);
+      setSaved(true);
+      if (embedded && onGenerated) onGenerated();
+      else setMode("editor");
+    }, 1150);
   }
 
   function mockExport() {
     setExported(true);
     window.setTimeout(() => setExported(false), 2200);
+  }
+
+  function closeBuilder() {
+    if (embedded && onClose) onClose();
+    else {
+      setMode("library");
+      onLibraryOpen?.();
+    }
+  }
+
+  function saveResume() {
+    setSaved(true);
+    if (embedded && onSaved) onSaved();
+    else {
+      setMode("library");
+      onLibraryOpen?.();
+    }
   }
 
   if (mode === "library") return (
@@ -281,17 +310,17 @@ export default function ResumeBuilder({ experiences, initialTarget }: Props) {
       <section className="resume-skill-overview"><header><h2>已具備技能</h2><div className="analysis-tabs resume-skill-tabs">{categorizedSkills.map((category) => <button className={activeSkillCategory === category.label ? "active" : ""} key={category.label} onClick={() => setActiveSkillCategory(category.label)}>{category.label}</button>)}</div><div className="skill-level-legend"><span><i className="mastered" />精熟</span><span><i className="applied" />活用</span><span><i className="beginner" />入門</span></div></header><div className="resume-active-skill-list">{activeSkillGroup.skills.length ? activeSkillGroup.skills.map((skill) => <span className={`skill-level-${skillLevel(skill)}`} title={`${skillLevelLabel(skill)}・出現在 ${skillExperienceCounts[skill]} 段經驗`} key={skill}>{skill}</span>) : <small>尚無技能</small>}</div></section>
       <div className="resume-list-heading"><div><h3>所有履歷</h3><span>3 個版本</span></div><div className="resume-list-controls"><label className="library-search"><span>⌕</span><input value={resumeQuery} onChange={(event) => setResumeQuery(event.target.value)} placeholder="搜尋履歷標題或內容關鍵字" /></label><button className="add-button" onClick={() => { setMode("wizard"); setWizardStep(1); setTargetMode("general"); setTargetJob("通用履歷"); }}>＋ 建立履歷</button></div></div>
       <div className="resume-file-grid">
-        {filteredResumeFiles.map((resume) => <button className="resume-file" key={resume.title} onClick={() => { setTemplate(resume.template === "專案導向版" ? "project" : "ats"); setTargetJob(resume.score ? `${resume.title} · ${resume.company}` : "通用履歷"); setMode("editor"); }}><div className={`resume-thumbnail ${resume.color}`}><div><strong>宋宇倫</strong><span /><span /><b /><b /><b /><i /></div></div><div className="resume-file-info"><span>{resume.company}</span><h3>{resume.title}</h3><p>{resume.template} · 1 頁</p><div><small>更新於 {resume.date}</small>{resume.score && <b>{resume.score}% 符合</b>}</div></div></button>)}
+        {filteredResumeFiles.map((resume) => <button className="resume-file" key={resume.title} onClick={() => { setTemplate(resume.template === "專案導向版" ? "project" : "ats"); setTargetJob(resume.score ? `${resume.title} · ${resume.company}` : "通用履歷"); setMode("editor"); }}><div className={`resume-thumbnail ${resume.color}`}><div><strong>宋宇倫</strong><span /><span /><b /><b /><b /><i /></div></div><div className="resume-file-info"><span>{resume.company}</span><h3>{resume.title}</h3><p>{resume.template} · 1 頁</p><div><small>更新於 {resume.date}</small></div></div></button>)}
         <button className="new-resume-file" onClick={() => { setMode("wizard"); setWizardStep(1); setTargetMode("general"); setTargetJob("通用履歷"); }}><span>＋</span><strong>建立履歷</strong><small>選擇職缺或從空白開始</small></button>
       </div>
     </section>
   );
 
   if (mode === "wizard") return (
-    <div className="resume-wizard-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setMode("library"); }}>
+    <div className="resume-wizard-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) closeBuilder(); }}>
     <section className="resume-wizard" onMouseDown={(event) => event.stopPropagation()}>
-      <header className="resume-wizard-header flow-header"><div className="flow-brand"><span className="brand-mark">G</span><span>建立履歷</span></div><div className="stepper" aria-label={`步驟 ${wizardStep}，共 4 步`}>{["目標", "格式", "模板", "內容"].map((label, index) => <div className={wizardStep >= index + 1 ? "is-active" : ""} key={label}><span>{wizardStep > index + 1 ? "✓" : index + 1}</span><small>{label}</small></div>)}</div><button className="flow-close" aria-label="關閉建立履歷" onClick={() => setMode("library")}>×</button></header>
-      {generating ? <div className="resume-generating"><div className="paper-stack"><span /><span /><span>✦</span></div><span className="flow-kicker">BUILDING YOUR RESUME</span><h2>正在挑選最適合的經驗</h2><p>根據職缺條件調整順序、重點與篇幅⋯</p><small>Prototype 模擬，不會呼叫任何 API</small></div> : <div className="resume-wizard-content">
+      <header className="resume-wizard-header flow-header"><div className="flow-brand"><span className="brand-mark">G</span><span>建立履歷</span></div><div className="stepper" aria-label={`步驟 ${wizardStep}，共 4 步`}>{["目標", "格式", "模板", "內容"].map((label, index) => <div className={wizardStep >= index + 1 ? "is-active" : ""} key={label}><span>{wizardStep > index + 1 ? "✓" : index + 1}</span><small>{label}</small></div>)}</div><button className="flow-close" aria-label="關閉建立履歷" onClick={closeBuilder}>×</button></header>
+      {generating ? <div className="resume-generating"><div className="paper-stack"><span /><span /><span>✦</span></div><span className="flow-kicker">BUILDING YOUR RESUME</span><h2>正在挑選最適合的經驗</h2><p>根據職缺條件調整順序、重點與篇幅⋯</p><small>Prototype 模擬，不會呼叫任何 API</small></div> : <div className="resume-wizard-content" ref={wizardContent}>
         {wizardStep === 1 && <>
           <div className="wizard-title"><span className="flow-kicker">STEP 01 · TARGET</span><h2>這份履歷要用在哪裡？</h2><p>選擇目標後，我們會建議最相關的經驗與關鍵詞。</p></div>
           <div className="resume-target-options">
@@ -317,15 +346,15 @@ export default function ResumeBuilder({ experiences, initialTarget }: Props) {
         {wizardStep === 2 && <><div className="wizard-title"><span className="flow-kicker">STEP 02 · FORMAT</span><h2>選擇語言與篇幅</h2></div><div className="format-grid"><article><span>履歷語言</span><div>{["繁體中文", "English"].map((item) => <button className={language === item ? "selected" : ""} key={item} onClick={() => setLanguage(item)}><b>{item === "繁體中文" ? "中" : "EN"}</b><strong>{item}</strong><small>{language === item ? "✓ 已選擇" : "選擇"}</small></button>)}</div></article><article><span>履歷篇幅</span><div>{["1 頁", "2 頁"].map((item) => <button className={pageCount === item ? "selected" : ""} key={item} onClick={() => setPageCount(item)}><b className={`page-icon ${item === "2 頁" ? "two-pages" : "one-page"}`} aria-hidden="true"><i /><i /></b><strong>{item}</strong><small>{item === "1 頁" ? "精簡、適合新鮮人" : "保留更多經驗細節"}</small></button>)}</div></article></div></>}
         {wizardStep === 3 && <><div className="wizard-title"><span className="flow-kicker">STEP 03 · TEMPLATE</span><h2>選擇履歷模板</h2></div><div className="template-choice-grid">{(Object.keys(templateInfo) as Template[]).map((key) => <button className={template === key ? "selected" : ""} key={key} onClick={() => setTemplate(key)}><div className={`template-paper ${key}`}><header><b /><span /></header><i /><i /><section><span /><span /><span /></section><i /><i /></div><div><strong>{templateInfo[key].name}</strong><small>{templateInfo[key].note}</small></div><span>{template === key ? "✓" : "○"}</span></button>)}</div></>}
         {wizardStep === 4 && <><div className="wizard-title"><span className="flow-kicker">STEP 04 · CONTENT</span><h2>確認要放進履歷的經驗</h2></div><div className="experience-picker">{experiences.slice(0, 6).map((item, index) => <button className={selectedExperiences.includes(index) ? "selected" : ""} key={item.title} onClick={() => toggleExperience(index)}><span>{selectedExperiences.includes(index) ? "✓" : "+"}</span><div><small>{item.type} · {item.org}</small><strong>{item.title}</strong><p>{item.description}</p><span>{item.tags.map((tag) => <i key={tag}>{tag}</i>)}</span></div><b>{index < 3 ? "高度相關" : "可選"}</b></button>)}</div></>}
-        <footer className="wizard-footer"><button onClick={() => wizardStep === 1 ? setMode("library") : setWizardStep(wizardStep - 1)}>{wizardStep === 1 ? "取消" : "← 上一步"}</button><div><small>{wizardStep} / 4</small><i><b style={{ width: `${wizardStep * 25}%` }} /></i></div>{wizardStep < 4 ? <button className="primary-flow-button" disabled={wizardStep === 1 && !targetJob} onClick={() => setWizardStep(wizardStep + 1)}>下一步　→</button> : <button className="primary-flow-button" onClick={generateResume}>產生履歷　✦</button>}</footer>
+        <footer className={`wizard-footer${wizardStep === 1 ? " first-step" : ""}`}>{wizardStep > 1 && <button onClick={() => setWizardStep(wizardStep - 1)}>← 上一步</button>}<div><small>{wizardStep} / 4</small><i><b style={{ width: `${wizardStep * 25}%` }} /></i></div>{wizardStep < 4 ? <button className="primary-flow-button" disabled={wizardStep === 1 && !targetJob} onClick={() => setWizardStep(wizardStep + 1)}>下一步　→</button> : <button className="primary-flow-button" onClick={generateResume}>產生履歷　✦</button>}</footer>
       </div>}
     </section>
     </div>
   );
 
   return (
-    <section className="resume-editor-page page-enter">
-      <header className="editor-header"><button onClick={() => setMode("library")}>← 我的履歷</button><div className="resume-title-editor"><input ref={resumeTitleInput} defaultValue="Associate Product Manager｜Orbit" onChange={() => setSaved(false)} /><button aria-label="編輯履歷標題" title="編輯標題" onClick={() => resumeTitleInput.current?.focus()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg></button></div><div><button onClick={() => { setSaved(true); setMode("library"); }}>儲存履歷</button><button className="export-button" onClick={mockExport}>{exported ? "✓ 模擬匯出完成" : "匯出 PDF　↧"}</button></div></header>
+    <section className={`resume-editor-page page-enter${embedded ? " resume-editor-overlay" : ""}`}>
+      <header className="editor-header"><button onClick={closeBuilder}>{embedded ? "← 職缺探索" : "← 我的履歷"}</button><div className="resume-title-editor"><input ref={resumeTitleInput} value={resumeTitle} style={{ width: Math.min(560, Math.max(120, [...resumeTitle].reduce((width, character) => width + (character.charCodeAt(0) > 255 ? 16 : 9), 24))) }} onChange={(event) => { setResumeTitle(event.target.value); setSaved(false); }} /><button aria-label="編輯履歷標題" title="編輯標題" onClick={() => resumeTitleInput.current?.focus()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg></button></div><div><button onClick={saveResume}>儲存履歷</button><button className="export-button" onClick={mockExport}>{exported ? "✓ 模擬匯出完成" : "匯出 PDF　↧"}</button></div></header>
       <div className="editor-toolbar"><div><button className={activePanel === "content" ? "active" : ""} onClick={() => setActivePanel("content")}>內容</button><button className={activePanel === "design" ? "active" : ""} onClick={() => setActivePanel("design")}>設計</button></div><span>目標：<b>{targetJob}</b></span><div><button aria-label="縮小履歷" disabled={resumeZoom <= 60} onClick={() => setResumeZoom((zoom) => Math.max(60, zoom - 5))}>−</button><span>{resumeZoom}%</span><button aria-label="放大履歷" disabled={resumeZoom >= 120} onClick={() => setResumeZoom((zoom) => Math.min(120, zoom + 5))}>＋</button></div></div>
       <div className="resume-editor-layout">
         <aside className="editor-left">

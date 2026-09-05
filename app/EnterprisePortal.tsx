@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import ProfileEditModal from "./ProfileEditModal";
 
 type Talent = {
   id: number;
@@ -168,6 +169,9 @@ const talents: Talent[] = [
   },
 ];
 
+const candidateGrades = ["大四", "碩二", "大三", "應屆畢業", "碩一", "大四", "大三", "應屆畢業"];
+const candidateSubmittedAt = ["今天 09:42", "今天 08:15", "昨天 18:30", "昨天 14:05", "9 月 3 日", "9 月 2 日", "9 月 1 日", "8 月 31 日"];
+
 type PublicResume = {
   id: string;
   title: string;
@@ -274,7 +278,7 @@ export default function EnterprisePortal({
 }: {
   onSwitchRole: () => void;
 }) {
-  const [view, setView] = useState<"talent" | "jobs" | "publish">("talent");
+  const [view, setView] = useState<"jobs" | "resumes">("jobs");
   const [title, setTitle] = useState("Associate Product Manager");
   const [description, setDescription] = useState(
     "協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。",
@@ -282,18 +286,21 @@ export default function EnterprisePortal({
   const [requirements, setRequirements] = useState(
     "使用者研究\n產品需求分析\n跨部門協作\n數據分析能力",
   );
+  const [bonusRequirements, setBonusRequirements] = useState("Figma\nSQL");
   const [activeJob, setActiveJob] = useState("Associate Product Manager");
+  const [publishedJobDescription, setPublishedJobDescription] = useState(
+    "協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。",
+  );
+  const [publishedJobRequirements, setPublishedJobRequirements] = useState(
+    "使用者研究\n產品需求分析\n跨部門協作\n數據分析能力",
+  );
+  const [publishedJobBonusRequirements, setPublishedJobBonusRequirements] = useState("Figma\nSQL");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("全部地點");
   const [experience, setExperience] = useState("全部年資");
   const [skill, setSkill] = useState("全部技能");
   const [aiSkills, setAiSkills] = useState<string[]>([]);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState([
-    "告訴我你想找什麼樣的人，我會把描述拆成篩選條件並重新排序人才。",
-  ]);
   const [selectedTalent, setSelectedTalent] = useState<Talent | null>(null);
   const [selectedResume, setSelectedResume] = useState<PublicResume | null>(
     null,
@@ -308,16 +315,34 @@ export default function EnterprisePortal({
   const [editingJob, setEditingJob] = useState<string | null>(null);
   const [closedJobs, setClosedJobs] = useState<string[]>([]);
   const [invited, setInvited] = useState<number[]>([]);
+  const [resumeReviewJob, setResumeReviewJob] = useState<string | null>(null);
+  const [resumeReviewQuery, setResumeReviewQuery] = useState("");
+  const [resumeReviewSort, setResumeReviewSort] = useState<"職缺適配度" | "最新投遞">("職缺適配度");
+  const [resumeGradeFilter, setResumeGradeFilter] = useState("全部年級");
+  const [resumeEducationFilter, setResumeEducationFilter] = useState("全部學歷");
+  const [resumeSkillFilters, setResumeSkillFilters] = useState<string[]>([]);
+  const [resumeFilterOpen, setResumeFilterOpen] = useState(false);
+  const [resumeProfileTalent, setResumeProfileTalent] = useState<Talent | null>(null);
+  const [savedResumeIds, setSavedResumeIds] = useState<string[]>([]);
+  const [showCompanyEditor, setShowCompanyEditor] = useState(false);
+  const [jobEditorOpen, setJobEditorOpen] = useState(false);
+  const [closingJobTitle, setClosingJobTitle] = useState<string | null>(null);
+  const [companyProfile, setCompanyProfile] = useState({ name: "Orbit 數位產品", bio: "招募團隊", avatar: "" });
+  const [managedJobQuery, setManagedJobQuery] = useState("");
+  const [managedJobSort, setManagedJobSort] = useState<"最新發布" | "瀏覽數" | "有興趣" | "已結束">("最新發布");
 
   const companyJobs = useMemo(
     () => [
       {
         title: activeJob,
-        requirements: requirements.split("\n").filter(Boolean),
+        requirements: publishedJobRequirements.split("\n").filter(Boolean),
+        bonusRequirements: publishedJobBonusRequirements.split("\n").filter(Boolean),
       },
-      ...fixedCompanyJobs.filter((job) => job.title !== activeJob),
+      ...fixedCompanyJobs
+        .filter((job) => job.title !== activeJob)
+        .map((job) => ({ ...job, bonusRequirements: [] as string[] })),
     ],
-    [activeJob, requirements],
+    [activeJob, publishedJobBonusRequirements, publishedJobRequirements],
   );
   const selectedJobMatch = companyJobs.find(
     (job) => job.title === selectedMatchJob,
@@ -326,7 +351,7 @@ export default function EnterprisePortal({
     ...job,
     description:
       index === 0
-        ? description
+        ? publishedJobDescription
         : job.title === "Associate Product Manager"
           ? "協助產品團隊進行需求研究、數據分析與功能規劃，並與設計及工程團隊合作推動產品迭代。"
           : job.title === "UX Researcher"
@@ -340,42 +365,79 @@ export default function EnterprisePortal({
   const selectedCompanyJob = managedJobs.find(
     (job) => job.title === selectedManagedJob,
   );
+  const visibleManagedJobs = managedJobs
+    .filter((job) => {
+      const searchable = `${job.title} ${job.description} ${job.requirements.join(" ")} ${job.bonusRequirements.join(" ")}`.toLowerCase();
+      return searchable.includes(managedJobQuery.trim().toLowerCase());
+    })
+    .sort((a, b) => managedJobSort === "瀏覽數"
+      ? b.views - a.views
+      : managedJobSort === "有興趣"
+        ? b.interested - a.interested
+        : managedJobSort === "已結束"
+          ? Number(closedJobs.includes(b.title)) - Number(closedJobs.includes(a.title))
+          : managedJobs.indexOf(a) - managedJobs.indexOf(b));
 
-  const visibleTalents = useMemo(
-    () =>
-      talents
-        .filter((talent) => {
-          const text = (
-            talent.nickname +
-            talent.headline +
-            talent.bio +
-            talent.skills.join(" ")
-          ).toLowerCase();
-          return (
-            text.includes(query.trim().toLowerCase()) &&
-            (location === "全部地點" || talent.location === location) &&
-            (experience === "全部年資" || talent.experience === experience) &&
-            (skill === "全部技能" || talent.skills.includes(skill)) &&
-            aiSkills.every((item) => talent.skills.includes(item))
-          );
-        })
-        .sort((a, b) => b.fit - a.fit),
-    [aiSkills, experience, location, query, skill],
-  );
+  const selectedReviewJob = managedJobs.find((job) => job.title === resumeReviewJob);
+  const reviewJobIndex = Math.max(0, managedJobs.findIndex((job) => job.title === resumeReviewJob));
+  const reviewCandidates = talents
+    .slice(0, Math.max(3, talents.length - reviewJobIndex * 2))
+    .map((talent, index) => ({
+      talent,
+      grade: candidateGrades[index],
+      submittedAt: candidateSubmittedAt[index],
+      submittedOrder: index,
+      fit: Math.max(55, talent.fit - reviewJobIndex * 5 + ((talent.id + reviewJobIndex) % 3)),
+    }))
+    .filter(({ talent, grade }) => {
+      const searchable = `${talent.nickname} ${talent.headline} ${talent.bio} ${talent.skills.join(" ")} ${talent.resume.join(" ")}`.toLowerCase();
+      return searchable.includes(resumeReviewQuery.trim().toLowerCase())
+        && (resumeGradeFilter === "全部年級" || grade === resumeGradeFilter)
+        && (resumeEducationFilter === "全部學歷" || talent.education === resumeEducationFilter)
+        && resumeSkillFilters.every((item) => talent.skills.includes(item));
+    })
+    .sort((a, b) => resumeReviewSort === "最新投遞" ? a.submittedOrder - b.submittedOrder : b.fit - a.fit);
+  const resumeFilterCount = Number(resumeGradeFilter !== "全部年級") + Number(resumeEducationFilter !== "全部學歷") + resumeSkillFilters.length;
+  const visibleTalents = talents
+    .filter((talent) => {
+      const text = `${talent.nickname} ${talent.headline} ${talent.bio} ${talent.skills.join(" ")}`.toLowerCase();
+      return text.includes(query.trim().toLowerCase())
+        && (location === "全部地點" || talent.location === location)
+        && (experience === "全部年資" || talent.experience === experience)
+        && (skill === "全部技能" || talent.skills.includes(skill))
+        && aiSkills.every((item) => talent.skills.includes(item));
+    })
+    .sort((a, b) => b.fit - a.fit);
+
+  useEffect(() => {
+    if (!resumeReviewJob && !resumeFilterOpen && !resumeProfileTalent && !selectedManagedJob && !jobEditorOpen && !closingJobTitle) return;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [closingJobTitle, jobEditorOpen, resumeFilterOpen, resumeProfileTalent, resumeReviewJob, selectedManagedJob]);
 
   function publishJob() {
-    if (!title.trim() || !description.trim()) return;
-    if (!requirements.trim())
-      setRequirements(
-        description.includes("研究")
-          ? "使用者研究\n需求分析\n跨部門協作\n產品規劃"
-          : "溝通協作\n問題分析\n專案執行",
-      );
+    if (!title.trim() || !description.trim() || !requirements.trim()) return;
+    const wasEditing = Boolean(editingJob);
+    const publishedRequirements = requirements.trim() || (description.includes("研究")
+      ? "使用者研究\n需求分析\n跨部門協作\n產品規劃"
+      : "溝通協作\n問題分析\n專案執行");
+    setRequirements(publishedRequirements);
     setActiveJob(title.trim());
+    setPublishedJobDescription(description.trim());
+    setPublishedJobRequirements(publishedRequirements);
+    setPublishedJobBonusRequirements(bonusRequirements.trim());
     setNotice(
       editingJob ? "職缺內容已更新" : "職缺已發布，人才排序已依新職缺更新",
     );
+    setSelectedManagedJob(wasEditing ? title.trim() : null);
     setEditingJob(null);
+    setJobEditorOpen(false);
     setView("jobs");
     window.setTimeout(() => setNotice(""), 2600);
   }
@@ -385,7 +447,8 @@ export default function EnterprisePortal({
     setTitle("");
     setDescription("");
     setRequirements("");
-    setView("publish");
+    setBonusRequirements("");
+    setJobEditorOpen(true);
   }
 
   function editCompanyJob(job: (typeof managedJobs)[number]) {
@@ -393,31 +456,8 @@ export default function EnterprisePortal({
     setTitle(job.title);
     setDescription(job.description);
     setRequirements(job.requirements.join("\n"));
-    setSelectedManagedJob(null);
-    setView("publish");
-  }
-
-  function askAi() {
-    const prompt = aiInput.trim();
-    if (!prompt) return;
-    const found = [
-      ["研究", "使用者研究"],
-      ["產品", "產品企劃"],
-      ["數據", "資料分析"],
-      ["figma", "Figma"],
-      ["專案", "專案管理"],
-    ]
-      .filter(([key]) => prompt.toLowerCase().includes(key))
-      .map(([, value]) => value);
-    setAiSkills(found);
-    setAiMessages((current) => [
-      ...current,
-      `你：${prompt}`,
-      found.length
-        ? `GoodJob：已轉成 ${found.join("、")} 等條件，人才清單已更新。`
-        : "GoodJob：我先保留現有條件並依語意重新檢視；你也可以加入技能或年資關鍵字。",
-    ]);
-    setAiInput("");
+    setBonusRequirements(job.bonusRequirements.join("\n"));
+    setJobEditorOpen(true);
   }
 
   return (
@@ -426,179 +466,104 @@ export default function EnterprisePortal({
         <div className="brand">
           <span className="brand-mark">G</span>
           <span>GoodJob</span>
-          <em>企業版</em>
-        </div>
-        <div className="enterprise-company">
-          <span>O</span>
-          <div>
-            <strong>Orbit 數位產品</strong>
-            <small>招募團隊</small>
-          </div>
+          <button className="enterprise-guide-button" aria-label="企業版導覽" onClick={() => { setNotice("企業版導覽將在下一階段開放"); window.setTimeout(() => setNotice(""), 2400); }}>?</button>
         </div>
         <nav>
           <button
-            className={view === "talent" ? "active" : ""}
-            onClick={() => setView("talent")}
-          >
-            <span>◎</span>人才瀏覽
-          </button>
-          <button
-            className={view === "jobs" || view === "publish" ? "active" : ""}
+            className={view === "jobs" ? "active" : ""}
             onClick={() => setView("jobs")}
           >
-            <span>▦</span>我的職缺
+            已發布職缺
+          </button>
+          <button
+            className={view === "resumes" ? "active" : ""}
+            onClick={() => { setView("resumes"); setResumeReviewJob(null); }}
+          >
+            檢視履歷
           </button>
         </nav>
         <div className="enterprise-sidebar-bottom">
-          <div>
-            <small>目前配對職缺</small>
-            <strong>{activeJob}</strong>
-            <span>公開中</span>
-          </div>
           <button onClick={onSwitchRole}>⇄ 切換展示身分</button>
+          <button className="enterprise-company" onClick={() => setShowCompanyEditor(true)} aria-label="編輯企業資料">
+            <span className={companyProfile.avatar ? "has-image" : ""} style={companyProfile.avatar ? { backgroundImage: `url(${companyProfile.avatar})` } : undefined}>{!companyProfile.avatar && (companyProfile.name.slice(0, 1) || "企")}</span>
+            <div>
+              <strong>{companyProfile.name}</strong>
+            </div>
+          </button>
         </div>
       </aside>
       <section className="enterprise-main">
-        <header className="enterprise-topbar">
-          <div>
-            <span className="page-kicker">GOODJOB FOR BUSINESS</span>
-            <strong>人才配對工作台</strong>
-          </div>
-          <div>
-            <button>？ 企業版導覽</button>
-            <span className="enterprise-avatar">O</span>
-          </div>
-        </header>
         <div className="enterprise-content">
-          {view === "publish" ? (
-            <section className="job-publish-page page-enter">
-              <header className="page-title-row">
-                <div>
-                  <span className="page-kicker">PUBLISH A ROLE</span>
-                  <h1>{editingJob ? "編輯職缺" : "發布職缺"}</h1>
-                  <p>
-                    提供職缺核心資訊；要求可以留空，Prototype
-                    會依標題與敘述自動整理。
-                  </p>
-                </div>
-                <button
-                  className="add-button secondary"
-                  onClick={() => setView("jobs")}
-                >
-                  ← 返回我的職缺
-                </button>
-              </header>
-              <div className="job-publish-layout">
-                <main>
-                  <label>
-                    <span>
-                      職缺名稱 <b>必填</b>
-                    </span>
-                    <input
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder="例如：Associate Product Manager"
-                    />
-                  </label>
-                  <label>
-                    <span>
-                      職缺敘述 <b>必填</b>
-                    </span>
-                    <textarea
-                      rows={9}
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
-                      placeholder="描述這個角色的任務、團隊與期待…"
-                    />
-                  </label>
-                  <label>
-                    <span>
-                      要求點 <small>選填，每行一項</small>
-                    </span>
-                    <textarea
-                      rows={7}
-                      value={requirements}
-                      onChange={(event) => setRequirements(event.target.value)}
-                      placeholder="留空時，會依現有資訊自動摘要"
-                    />
-                  </label>
-                  <button
-                    className="primary-flow-button"
-                    disabled={!title.trim() || !description.trim()}
-                    onClick={publishJob}
-                  >
-                    {editingJob ? "儲存職缺變更　→" : "發布職缺並開始配對　→"}
-                  </button>
-                </main>
-                <aside>
-                  <span>✦</span>
-                  <h2>條件摘要預覽</h2>
-                  <p>
-                    企業提供的內容會被整理成可逐項比對的條件，用來計算人才匹配度。
-                  </p>
-                  <div>
-                    {(requirements.trim()
-                      ? requirements.split("\n")
-                      : ["將由 AI 根據職缺內容整理"]
-                    )
-                      .filter(Boolean)
-                      .map((item) => (
-                        <span key={item}>✓ {item}</span>
-                      ))}
-                  </div>
-                  <small>Prototype 僅在本機模擬摘要，不會呼叫 API。</small>
-                </aside>
-              </div>
-            </section>
-          ) : view === "jobs" ? (
+          {view === "jobs" ? (
             <section className="enterprise-jobs-page page-enter">
               <header className="page-title-row">
                 <div>
                   <span className="page-kicker">YOUR OPEN ROLES</span>
-                  <h1>我的職缺</h1>
-                  <p>管理 Orbit 數位產品發布的職缺、人才興趣與招募狀態。</p>
+                  <h1>已發布職缺</h1>
+                  <p>管理企業發布的職缺、人才興趣與招募狀態</p>
                 </div>
-                <button className="add-button" onClick={startNewJob}>
-                  ＋ 發布新職缺
-                </button>
+                <div className="enterprise-job-header-actions">
+                  <label className="enterprise-job-search">
+                    <span>⌕</span>
+                    <input
+                      value={managedJobQuery}
+                      onChange={(event) => setManagedJobQuery(event.target.value)}
+                      placeholder="搜尋職缺或關鍵字"
+                    />
+                  </label>
+                  <select
+                    value={managedJobSort}
+                    onChange={(event) => setManagedJobSort(event.target.value as typeof managedJobSort)}
+                    aria-label="職缺排序方式"
+                  >
+                    <option>最新發布</option>
+                    <option>瀏覽數</option>
+                    <option>有興趣</option>
+                    <option>已結束</option>
+                  </select>
+                  <button className="add-button" onClick={startNewJob}>
+                    ＋ 發布職缺
+                  </button>
+                </div>
               </header>
               <div className="company-job-summary">
                 <article>
-                  <span>招募中</span>
+                  <span>招募中職缺</span>
                   <strong>
                     {
                       managedJobs.filter((job) => job.status === "招募中")
                         .length
                     }
                   </strong>
-                  <small>個公開職缺</small>
                 </article>
                 <article>
-                  <span>人才興趣</span>
+                  <span>有興趣的人才</span>
                   <strong>
                     {managedJobs.reduce((sum, job) => sum + job.interested, 0)}
                   </strong>
-                  <small>位人才表示有興趣</small>
                 </article>
                 <article>
                   <span>累積瀏覽</span>
                   <strong>
                     {managedJobs.reduce((sum, job) => sum + job.views, 0)}
                   </strong>
-                  <small>次職缺瀏覽</small>
                 </article>
               </div>
               <div className="company-job-grid">
-                {managedJobs.map((job, index) => (
-                  <button
+                {visibleManagedJobs.map((job) => (
+                  <article
                     className={job.status === "已結束" ? "closed" : ""}
                     key={job.title}
-                    onClick={() => setSelectedManagedJob(job.title)}
                   >
+                    <button
+                      className="company-job-card-open"
+                      aria-label={`查看 ${job.title} 職缺詳情`}
+                      onClick={() => setSelectedManagedJob(job.title)}
+                    />
                     <header>
                       <span className="company-job-logo">O</span>
                       <div>
-                        <small>Orbit 數位產品</small>
+                        {job.status !== "已結束" && <small>{job.postedAt}發布</small>}
                         <strong>{job.title}</strong>
                       </div>
                       <em>{job.status}</em>
@@ -610,22 +575,63 @@ export default function EnterprisePortal({
                       ))}
                     </div>
                     <footer>
-                      <span>
-                        <b>{job.interested}</b> 人有興趣
-                      </span>
-                      <span>
-                        <b>{job.views}</b> 次瀏覽
-                      </span>
-                      <small>{job.postedAt}發布</small>
-                      <em>查看管理　→</em>
+                      <div className="company-job-metrics">
+                        <span><b>{job.interested}</b> 人有興趣</span>
+                        <span><b>{job.views}</b> 次瀏覽</span>
+                      </div>
+                      <div className="company-job-card-actions">
+                        <button onClick={(event) => { event.stopPropagation(); editCompanyJob(job); }}>編輯職缺</button>
+                        <button
+                          className="danger"
+                          disabled={job.status === "已結束"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setClosingJobTitle(job.title);
+                          }}
+                        >
+                          結束招募
+                        </button>
+                      </div>
                     </footer>
-                    {index === 0 && job.status === "招募中" && (
-                      <i>目前用於人才配對</i>
-                    )}
-                  </button>
+                  </article>
                 ))}
               </div>
             </section>
+          ) : view === "resumes" ? (
+            <>
+              {resumeReviewJob && selectedReviewJob ? (
+                <section className="enterprise-resume-workspace page-enter">
+                  <header className="resume-workspace-header">
+                    <div><span className="page-kicker">RECEIVED RESUMES</span><h1>{selectedReviewJob.title}</h1><p>目前收到 {reviewCandidates.length} 份履歷</p></div>
+                    <button className="resume-workspace-back" onClick={() => { setResumeReviewJob(null); setResumeReviewQuery(""); }}>← 返回檢視履歷</button>
+                  </header>
+                  <div className="resume-review-toolbar">
+                    <label className="resume-review-search"><span>⌕</span><input value={resumeReviewQuery} onChange={(event) => setResumeReviewQuery(event.target.value)} placeholder="搜尋姓名、技能或履歷關鍵字" /></label>
+                    <button className={resumeFilterCount ? "active" : ""} onClick={() => setResumeFilterOpen(true)}>篩選{resumeFilterCount ? ` (${resumeFilterCount})` : ""}</button>
+                    <select aria-label="履歷排序方式" value={resumeReviewSort} onChange={(event) => setResumeReviewSort(event.target.value as "職缺適配度" | "最新投遞")}><option>職缺適配度</option><option>最新投遞</option></select>
+                  </div>
+                  <div className="resume-review-results-heading"><strong>{reviewCandidates.length} 份履歷</strong><span>{resumeReviewSort === "職缺適配度" ? "依履歷內容與職缺適配度排序" : "依投遞時間由新到舊排序"}</span></div>
+                  {reviewCandidates.length ? <div className="received-resume-grid">{reviewCandidates.map(({ talent, grade, submittedAt, fit }) => {
+                    const saveKey = `${selectedReviewJob.title}-${talent.id}`;
+                    const isSaved = savedResumeIds.includes(saveKey);
+                    return <article className="received-resume-card" key={talent.id}>
+                      <header><button className="received-resume-avatar" aria-label={`查看 ${talent.nickname} 的自我介紹`} onClick={() => setResumeProfileTalent(talent)}>{talent.nickname.slice(0, 1)}</button><div><small>{submittedAt} 投遞</small><h2>{talent.headline.split("｜")[0]}</h2><p>{talent.nickname}</p></div><button className={`received-resume-save${isSaved ? " saved" : ""}`} aria-label={isSaved ? "取消收藏履歷" : "收藏履歷"} onClick={() => setSavedResumeIds((current) => current.includes(saveKey) ? current.filter((item) => item !== saveKey) : [...current, saveKey])}><span aria-hidden="true">♡</span>{isSaved ? "已收藏" : "收藏"}</button></header>
+                      <div className="received-resume-meta"><span>{grade}</span><span>{talent.education}</span><span>{talent.experience}</span><span>{talent.location}</span></div>
+                      <p>{talent.resume[0]}</p>
+                      <div className="received-resume-skills">{talent.skills.map((item) => <span key={item}>{item}</span>)}</div>
+                      <footer><span>履歷內容與職缺適配度</span><strong>{fit}<small>%</small></strong></footer>
+                    </article>;
+                  })}</div> : <div className="resume-review-empty"><span>⌕</span><h2>找不到符合條件的履歷</h2><button onClick={() => { setResumeReviewQuery(""); setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}>清除搜尋與篩選</button></div>}
+                </section>
+              ) : (
+                <section className="enterprise-resume-overview page-enter">
+                  <header className="page-title-row"><div><span className="page-kicker">RESUME REVIEW</span><h1>檢視履歷</h1><p>依職缺查看目前收到的履歷與適配排序。</p></div></header>
+                  <div className="resume-job-grid">{managedJobs.map((job, index) => <button key={job.title} onClick={() => { setResumeReviewJob(job.title); setResumeReviewQuery(""); setResumeReviewSort("職缺適配度"); setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}><header><span className="company-job-logo">O</span><div><small>Orbit 數位產品</small><strong>{job.title}</strong></div><em>{job.status}</em></header><div className="resume-job-count"><strong>{Math.max(3, talents.length - index * 2)}</strong><span>份履歷</span></div><footer><span>最新投遞：{candidateSubmittedAt[Math.min(index, candidateSubmittedAt.length - 1)]}</span><b>查看履歷 →</b></footer></button>)}</div>
+                </section>
+              )}
+              {resumeFilterOpen && <div className="enterprise-resume-filter-backdrop"><section className="enterprise-resume-filter-modal" role="dialog" aria-modal="true" aria-labelledby="resume-filter-title"><header><div><span className="page-kicker">FILTER RESUMES</span><h2 id="resume-filter-title">篩選履歷</h2></div><button aria-label="關閉篩選" onClick={() => setResumeFilterOpen(false)}>×</button></header><main><label><span>年級</span><select value={resumeGradeFilter} onChange={(event) => setResumeGradeFilter(event.target.value)}><option>全部年級</option>{[...new Set(candidateGrades)].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>學歷</span><select value={resumeEducationFilter} onChange={(event) => setResumeEducationFilter(event.target.value)}><option>全部學歷</option>{[...new Set(talents.map((item) => item.education))].map((item) => <option key={item}>{item}</option>)}</select></label><fieldset><legend>具備技能</legend><div>{[...new Set(talents.flatMap((item) => item.skills))].sort().map((item) => <label key={item}><input type="checkbox" checked={resumeSkillFilters.includes(item)} onChange={() => setResumeSkillFilters((current) => current.includes(item) ? current.filter((skill) => skill !== item) : [...current, item])} /><span>{item}</span></label>)}</div></fieldset></main><footer><button onClick={() => { setResumeGradeFilter("全部年級"); setResumeEducationFilter("全部學歷"); setResumeSkillFilters([]); }}>清除全部</button><button className="primary-flow-button" onClick={() => setResumeFilterOpen(false)}>套用篩選</button></footer></section></div>}
+              {resumeProfileTalent && <div className="resume-candidate-profile-backdrop"><section className="resume-candidate-profile" role="dialog" aria-modal="true" aria-labelledby="resume-candidate-name"><header><span className="received-resume-avatar">{resumeProfileTalent.nickname.slice(0, 1)}</span><div><span>履歷投遞者</span><h2 id="resume-candidate-name">{resumeProfileTalent.nickname}</h2><p>{resumeProfileTalent.headline}</p></div><button aria-label="關閉投遞者資料" onClick={() => setResumeProfileTalent(null)}>×</button></header><main><h3>自我介紹</h3><p>{resumeProfileTalent.bio}</p></main></section></div>}
+            </>
           ) : (
             <section className="enterprise-talent-page page-enter">
               <header className="page-title-row">
@@ -699,7 +705,7 @@ export default function EnterprisePortal({
                         )
                       }
                     >
-                      {item}　×
+                      {item} <span aria-hidden="true">×</span>
                     </button>
                   ))}
                   <button onClick={() => setAiSkills([])}>清除</button>
@@ -714,20 +720,7 @@ export default function EnterprisePortal({
               </div>
               <div className="talent-grid">
                 {visibleTalents.map((talent, index) => (
-                  <article
-                    className="talent-card"
-                    key={talent.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`查看 ${talent.nickname} 的公開資料`}
-                    onClick={() => setSelectedTalent(talent)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setSelectedTalent(talent);
-                      }
-                    }}
-                  >
+                  <article className="talent-card" key={talent.id}>
                     <header>
                       <span className="talent-avatar">
                         {talent.nickname.slice(0, 1)}
@@ -737,7 +730,7 @@ export default function EnterprisePortal({
                         <h2>{talent.nickname}</h2>
                         <p>{talent.headline}</p>
                       </div>
-                      <span className="talent-card-link">查看詳細　→</span>
+                      <span className="talent-card-link">查看詳細 →</span>
                     </header>
                     <small className="talent-summary-label">
                       {talent.id % 3 === 0 ? "本人撰寫摘要" : "✦ AI 統整摘要"}
@@ -786,58 +779,6 @@ export default function EnterprisePortal({
           )}
         </div>
       </section>
-      {aiOpen && (
-        <aside className="talent-ai-drawer">
-          <header>
-            <div>
-              <span>✦</span>
-              <div>
-                <strong>AI 人才搜尋</strong>
-                <small>用自然語言描述理想人選</small>
-              </div>
-            </div>
-            <button onClick={() => setAiOpen(false)}>×</button>
-          </header>
-          <div className="talent-ai-messages">
-            {aiMessages.map((message, index) => (
-              <p
-                className={message.startsWith("你：") ? "user" : ""}
-                key={index}
-              >
-                {message}
-              </p>
-            ))}
-          </div>
-          <div className="talent-ai-examples">
-            <span>試著問</span>
-            {[
-              "找有使用者研究和產品經驗的人",
-              "想找會數據分析的人",
-              "找熟悉 Figma 的新鮮人",
-            ].map((item) => (
-              <button key={item} onClick={() => setAiInput(item)}>
-                {item}
-              </button>
-            ))}
-          </div>
-          <footer>
-            <textarea
-              rows={3}
-              value={aiInput}
-              onChange={(event) => setAiInput(event.target.value)}
-              placeholder="我想找…"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  askAi();
-                }
-              }}
-            />
-            <button onClick={askAi}>送出　↑</button>
-          </footer>
-          <small>本機規則模擬，不會傳送資料</small>
-        </aside>
-      )}
       {selectedTalent && (
         <div
           className="talent-modal-backdrop"
@@ -881,7 +822,7 @@ export default function EnterprisePortal({
                           <strong>{item.title}</strong>
                           <p>{item.outcome}</p>
                         </span>
-                        <em>查看詳細　→</em>
+                        <em>查看詳細 →</em>
                       </button>
                     ))}
                   </div>
@@ -923,7 +864,7 @@ export default function EnterprisePortal({
                           <small>
                             {resume.updatedAt} · {resume.target}
                           </small>
-                          <em>開啟履歷　→</em>
+                          <em>開啟履歷 →</em>
                         </span>
                       </button>
                     ))}
@@ -1021,48 +962,170 @@ export default function EnterprisePortal({
           </article>
         </div>
       )}
+      {jobEditorOpen && (
+        <div
+          className="enterprise-job-drawer-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={editingJob ? "編輯職缺" : "發布職缺"}
+        >
+          <button
+            className="modal-backdrop-dismiss"
+            aria-label="關閉職缺編輯"
+            onClick={() => {
+              setJobEditorOpen(false);
+              setEditingJob(null);
+              setSelectedManagedJob(null);
+            }}
+          />
+          <aside className="enterprise-job-drawer">
+            <header>
+              <div>
+                <span className="page-kicker">PUBLISH A ROLE</span>
+                <h2>{editingJob ? "編輯職缺" : "發布職缺"}</h2>
+              </div>
+              <button
+                className="flow-close"
+                aria-label="關閉職缺編輯"
+                onClick={() => {
+                  setJobEditorOpen(false);
+                  setEditingJob(null);
+                  setSelectedManagedJob(null);
+                }}
+              >
+                ×
+              </button>
+            </header>
+            <div className="enterprise-job-drawer-content">
+              <div className="job-publish-layout">
+                <main>
+                  <label>
+                    <span>職缺名稱 <b>必填</b></span>
+                    <input
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="例如：Associate Product Manager"
+                    />
+                  </label>
+                  <label>
+                    <span>職缺敘述 <b>必填</b></span>
+                    <textarea
+                      rows={9}
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      placeholder="描述這個角色的任務、團隊與期待…"
+                    />
+                  </label>
+                  <div className="job-skill-fields">
+                    <label>
+                      <span>必備技能 <b>必填</b></span>
+                      <textarea
+                        rows={7}
+                        value={requirements}
+                        onChange={(event) => setRequirements(event.target.value)}
+                        placeholder="每行輸入一項必備技能"
+                      />
+                    </label>
+                    <label>
+                      <span>加分技能 <small>選填</small></span>
+                      <textarea
+                        rows={7}
+                        value={bonusRequirements}
+                        onChange={(event) => setBonusRequirements(event.target.value)}
+                        placeholder="每行輸入一項加分技能"
+                      />
+                    </label>
+                  </div>
+                </main>
+              </div>
+            </div>
+            <footer className="enterprise-job-drawer-footer">
+              <button
+                className="enterprise-job-editor-cancel"
+                onClick={() => {
+                  setJobEditorOpen(false);
+                  setEditingJob(null);
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="primary-flow-button"
+                disabled={!title.trim() || !description.trim() || !requirements.trim()}
+                onClick={publishJob}
+              >
+                {editingJob ? "儲存變更" : "發布職缺　→"}
+              </button>
+            </footer>
+          </aside>
+        </div>
+      )}
+      {closingJobTitle && (
+        <div className="resume-application-overlay enterprise-close-job-overlay">
+          <section className="resume-application-modal confirmation enterprise-close-job-modal" role="dialog" aria-modal="true" aria-labelledby="close-job-title">
+            <header>
+              <div>
+                <h2 id="close-job-title">確認結束招募</h2>
+                <p>此操作會停止接受新的履歷投遞</p>
+              </div>
+              <button aria-label="關閉確認視窗" onClick={() => setClosingJobTitle(null)}>×</button>
+            </header>
+            <main className="resume-application-confirmation">
+              <span aria-hidden="true">!</span>
+              <p>確定要結束<strong>【{closingJobTitle}】</strong>的招募嗎？</p>
+            </main>
+            <footer>
+              <button onClick={() => setClosingJobTitle(null)}>取消</button>
+              <button
+                className="danger"
+                onClick={() => {
+                  setClosedJobs((current) => current.includes(closingJobTitle) ? current : [...current, closingJobTitle]);
+                  setClosingJobTitle(null);
+                  setSelectedManagedJob(null);
+                  setNotice("已結束此職缺的招募");
+                  window.setTimeout(() => setNotice(""), 2400);
+                }}
+              >
+                確認結束
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       {selectedCompanyJob && (
         <div
-          className="profile-item-backdrop"
+          className="profile-item-backdrop company-job-drawer-overlay"
           role="dialog"
           aria-modal="true"
           aria-label={`${selectedCompanyJob.title} 職缺管理`}
         >
+          <button className="modal-backdrop-dismiss" aria-label="關閉職缺詳情" onClick={() => setSelectedManagedJob(null)} />
           <article className="profile-item-modal company-job-dialog">
             <header>
-              <button onClick={() => setSelectedManagedJob(null)}>
-                × 關閉
-              </button>
-              <span>職缺管理</span>
-              <small>{selectedCompanyJob.status}</small>
+              <div className="company-job-drawer-title">
+                <div className="company-job-heading-meta">
+                  <em>{selectedCompanyJob.status}</em>
+                  {selectedCompanyJob.status !== "已結束" && <small>{selectedCompanyJob.postedAt}發布</small>}
+                </div>
+                <h2>{selectedCompanyJob.title}</h2>
+              </div>
+              <button className="flow-close" aria-label="關閉職缺詳情" onClick={() => setSelectedManagedJob(null)}>×</button>
             </header>
             <main>
-              <section className="company-job-dialog-heading">
-                <span className="company-job-logo">O</span>
-                <div>
-                  <small>
-                    Orbit 數位產品 · {selectedCompanyJob.postedAt}發布
-                  </small>
-                  <h2>{selectedCompanyJob.title}</h2>
-                  <p>{selectedCompanyJob.status}</p>
-                </div>
-              </section>
               <section className="company-job-interest-card">
                 <div>
                   <span>有興趣人才</span>
                   <strong>
                     {selectedCompanyJob.interested}
-                    <small> 人</small>
+                    <small>人</small>
                   </strong>
-                  <p>人才收藏職缺或表示希望進一步了解。</p>
                 </div>
                 <div>
                   <span>職缺瀏覽</span>
                   <strong>
                     {selectedCompanyJob.views}
-                    <small> 次</small>
+                    <small>次</small>
                   </strong>
-                  <p>自發布後累積的公開頁面瀏覽次數。</p>
                 </div>
               </section>
               <section>
@@ -1077,29 +1140,17 @@ export default function EnterprisePortal({
                   ))}
                 </div>
               </section>
-              <footer className="company-job-dialog-actions">
-                <button onClick={() => editCompanyJob(selectedCompanyJob)}>
-                  編輯職缺
-                </button>
-                <button
-                  className="danger"
-                  disabled={selectedCompanyJob.status === "已結束"}
-                  onClick={() => {
-                    setClosedJobs((current) => [
-                      ...current,
-                      selectedCompanyJob.title,
-                    ]);
-                    setSelectedManagedJob(null);
-                    setNotice("已結束此職缺的招募");
-                    window.setTimeout(() => setNotice(""), 2400);
-                  }}
-                >
-                  {selectedCompanyJob.status === "已結束"
-                    ? "招募已結束"
-                    : "結束職缺招募"}
-                </button>
-              </footer>
             </main>
+            <footer className="company-job-dialog-actions">
+              <button onClick={() => editCompanyJob(selectedCompanyJob)}>編輯職缺</button>
+              <button
+                className="danger"
+                disabled={selectedCompanyJob.status === "已結束"}
+                onClick={() => setClosingJobTitle(selectedCompanyJob.title)}
+              >
+                {selectedCompanyJob.status === "已結束" ? "招募已結束" : "結束招募"}
+              </button>
+            </footer>
           </article>
         </div>
       )}
@@ -1354,6 +1405,7 @@ export default function EnterprisePortal({
           {notice}
         </div>
       )}
+      {showCompanyEditor && <ProfileEditModal variant="company" profile={companyProfile} onClose={() => setShowCompanyEditor(false)} onSave={(profile) => { setCompanyProfile(profile); setShowCompanyEditor(false); setNotice("企業資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
     </main>
   );
 }

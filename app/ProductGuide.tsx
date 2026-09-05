@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = { onClose: () => void; onNavigate: (view: string) => void };
 
@@ -14,7 +14,19 @@ const steps = [
 export default function ProductGuide({ onClose, onNavigate }: Props) {
   const [step,setStep] = useState(0);
   const current = steps[step];
+
+  useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
   return <div className="guide-backdrop" role="dialog" aria-modal="true" aria-labelledby="guide-title">
-    <section className="product-guide"><header><div className="brand"><span className="brand-mark">G</span><span>GoodJob</span></div><button aria-label="關閉產品導覽" onClick={onClose}>×</button></header><main><div className="guide-copy"><span className="page-kicker">{current.kicker}　·　{current.number} / 04</span><h2 id="guide-title">{current.title}</h2><p>{current.text}</p><div className="guide-actions"><button onClick={() => { onNavigate(current.view); onClose(); }}>{current.action}　→</button>{step < steps.length - 1 && <button onClick={() => setStep(step + 1)}>下一步</button>}</div></div><div className={`guide-visual guide-${step}`} aria-hidden="true"><div className="guide-orbit" /><div className="guide-card card-a"><i /><b /><span /><span /><span /></div><div className="guide-card card-b"><i /><b /><span /><span /></div><em>{current.number}</em></div></main><footer><button disabled={step === 0} onClick={() => setStep(step - 1)}>←</button><div>{steps.map((_,index) => <button aria-label={`前往第 ${index + 1} 步`} className={index === step ? "active" : ""} key={index} onClick={() => setStep(index)} />)}</div><button disabled={step === steps.length - 1} onClick={() => setStep(step + 1)}>→</button></footer></section>
+    <section className="product-guide"><header><div className="brand"><span className="brand-mark">G</span><span>GoodJob</span></div><button aria-label="關閉產品導覽" onClick={onClose}>×</button></header><main><div className="guide-copy"><span className="page-kicker">{current.kicker} · {current.number} / 04</span><h2 id="guide-title">{current.title}</h2><p>{current.text}</p><div className="guide-actions"><button onClick={() => { onNavigate(current.view); onClose(); }}>{current.action} →</button>{step < steps.length - 1 && <button onClick={() => setStep(step + 1)}>下一步</button>}</div></div><div className={`guide-visual guide-${step}`} aria-hidden="true"><div className="guide-orbit" /><div className="guide-card card-a"><i /><b /><span /><span /><span /></div><div className="guide-card card-b"><i /><b /><span /><span /></div><em>{current.number}</em></div></main><footer><button disabled={step === 0} onClick={() => setStep(step - 1)}>←</button><div>{steps.map((_,index) => <button aria-label={`前往第 ${index + 1} 步`} className={index === step ? "active" : ""} key={index} onClick={() => setStep(index)} />)}</div><button disabled={step === steps.length - 1} onClick={() => setStep(step + 1)}>→</button></footer></section>
   </div>;
 }

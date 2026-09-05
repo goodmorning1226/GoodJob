@@ -9,7 +9,7 @@ import AudienceGate from "./AudienceGate";
 import EnterprisePortal from "./EnterprisePortal";
 import ProductGuide from "./ProductGuide";
 import ProfileEditModal, { type TalentProfile } from "./ProfileEditModal";
-import { readEvidence, writeEvidence } from "./ExperienceEvidence";
+import { writeEvidence } from "./ExperienceEvidence";
 
 const navItems = [
   { label: "首頁" },
@@ -110,25 +110,25 @@ export default function Home() {
   });
   const [activeView, setActiveView] = useState("首頁");
   const [resumeTarget, setResumeTarget] = useState<string | undefined>();
+  const [showJobResumeFlow, setShowJobResumeFlow] = useState(false);
+  const [showGeneratedResumeEditor, setShowGeneratedResumeEditor] = useState(false);
   const [skillGroup, setSkillGroup] = useState<keyof typeof skillGroups>("核心能力");
-  const [evidenceCount, setEvidenceCount] = useState(0);
 
   useEffect(() => {
     const legacyKey = ["path", "ly-experiences-v1"].join("");
     const stored = window.localStorage.getItem("goodjob-experiences-v1") || window.localStorage.getItem(legacyKey);
     if (stored) {
-      try {
-        setExperiences(JSON.parse(stored));
-        window.localStorage.setItem("goodjob-experiences-v1", stored);
-      } catch { window.localStorage.removeItem("goodjob-experiences-v1"); }
+      const timer = window.setTimeout(() => {
+        try {
+          setExperiences(JSON.parse(stored));
+          window.localStorage.setItem("goodjob-experiences-v1", stored);
+        } catch { window.localStorage.removeItem("goodjob-experiences-v1"); }
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, []);
 
   useEffect(() => { window.localStorage.setItem("goodjob-experiences-v1", JSON.stringify(experiences)); }, [experiences]);
-
-  useEffect(() => {
-    setEvidenceCount(Object.values(readEvidence()).flat().length);
-  }, [experiences]);
 
   const hasNewExperience = experiences.length > initialExperiences.length;
   const knownDistributionTypes = new Set(experienceDistributionCategories.flatMap((category) => category.types));
@@ -170,6 +170,10 @@ export default function Home() {
       return;
     }
     if (["首頁", "我的經驗", "我的履歷", "職缺探索"].includes(label)) {
+      if (label !== "我的履歷") {
+        setShowGeneratedResumeEditor(false);
+        if (!showJobResumeFlow) setResumeTarget(undefined);
+      }
       setActiveView(label);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -309,13 +313,14 @@ export default function Home() {
           </section>
           </div>}
           {activeView === "我的經驗" && <ExperienceLibrary experiences={experiences} onAdd={() => setShowExperienceFlow(true)} />}
-          {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} />}
-          {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); handleNavigation("我的履歷"); }} />}
+          {activeView === "我的履歷" && <ResumeBuilder experiences={experiences} initialTarget={resumeTarget} startInEditor={showGeneratedResumeEditor} onLibraryOpen={() => { setShowGeneratedResumeEditor(false); setResumeTarget(undefined); }} />}
+          {activeView === "職缺探索" && <JobAnalysis onCreateResume={(target) => { setResumeTarget(target); setShowJobResumeFlow(true); }} />}
         </div>
       </section>
 
       {notice && <div className="toast" role="status"><span>✦</span>{notice}</div>}
       {showExperienceFlow && <ExperienceFlow onClose={() => setShowExperienceFlow(false)} onComplete={completeExperience} />}
+      {showJobResumeFlow && <ResumeBuilder key={`job-resume-${resumeTarget}`} experiences={experiences} initialTarget={resumeTarget} embedded onClose={() => { setShowJobResumeFlow(false); setResumeTarget(undefined); }} onGenerated={() => { setShowJobResumeFlow(false); setShowGeneratedResumeEditor(true); handleNavigation("我的履歷"); }} />}
       {showGuide && <ProductGuide onClose={() => setShowGuide(false)} onNavigate={handleNavigation} />}
       {showProfileEditor && <ProfileEditModal profile={profile} onClose={() => setShowProfileEditor(false)} onSave={(nextProfile) => { setProfile(nextProfile); setShowProfileEditor(false); setNotice("個人資料已更新"); window.setTimeout(() => setNotice(""), 2400); }} />}
       <nav className="mobile-bottom-nav" aria-label="手機主要導覽">{[{label:"首頁",icon:"⌂"},{label:"我的經驗",icon:"◇"},{label:"我的履歷",icon:"▤"},{label:"職缺探索",icon:"◎"}].map((item) => <button className={activeView === item.label ? "active" : ""} key={item.label} onClick={() => handleNavigation(item.label)}><span>{item.icon}</span>{item.label === "我的經驗" ? "經驗" : item.label === "我的履歷" ? "履歷" : item.label === "職缺探索" ? "探索" : item.label}</button>)}</nav>

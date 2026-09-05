@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type MatchStatus = "match" | "transfer" | "partial" | "gap";
 type Requirement = { name: string; status: MatchStatus; note: string; source: string; required?: boolean };
@@ -21,7 +21,15 @@ const jobs: Job[] = [
   { id: 12, title: "Growth Product Intern", company: "流星電商", field: "產品管理", location: "台北市", workMode: "混合辦公", employment: "實習", salary: "NT$ 200–240／時", fit: 75, interest: 86, posted: "一週內", summary: "協助成長團隊分析轉換流程、規劃實驗並追蹤指標，找出能改善新用戶體驗的產品機會。", responsibilities: ["整理漏斗數據與使用者回饋", "協助規劃成長實驗與驗證指標", "追蹤實驗結果並製作週報"], requirements: [{ name: "數據分析", status: "match", note: "具備問卷與社群成效分析經驗", source: "研究專題、社群內容分析", required: true }, { name: "產品研究", status: "match", note: "有訪談、需求分析及原型測試經驗", source: "產品實習、互動設計專案", required: true }, { name: "A/B Test", status: "gap", note: "尚未記錄正式實驗設計經驗", source: "尚無直接符合紀錄", required: true }, { name: "成長指標", status: "partial", note: "有互動率改善成果，產品漏斗證據較少", source: "社群內容成效分析" }] },
 ];
 
-const statusCopy: Record<MatchStatus, { label: string; icon: string }> = { match: { label: "明確符合", icon: "✓" }, transfer: { label: "可轉移", icon: "↗" }, partial: { label: "部分符合", icon: "◐" }, gap: { label: "尚未具備", icon: "×" } };
+type ResumeChoice = { id: string; title: string; company: string; template: string; updated: string; color: string };
+
+const resumeChoices: ResumeChoice[] = [
+  { id: "orbit-apm", title: "Associate Product Manager", company: "Orbit 數位產品", template: "ATS 專業版", updated: "今天 14:32", color: "green" },
+  { id: "ux-research", title: "UX Research Assistant", company: "日日生活科技", template: "專案導向版", updated: "昨天", color: "purple" },
+  { id: "general", title: "通用求職履歷", company: "未指定職缺", template: "ATS 專業版", updated: "8 月 22 日", color: "orange" },
+];
+
+const statusCopy: Record<MatchStatus, { label: string; icon: string }> = { match: { label: "明確符合", icon: "✓" }, transfer: { label: "部分符合", icon: "◐" }, partial: { label: "部分符合", icon: "◐" }, gap: { label: "尚未具備", icon: "×" } };
 type Props = { onCreateResume: (target: string) => void };
 
 export default function JobAnalysis({ onCreateResume }: Props) {
@@ -29,42 +37,113 @@ export default function JobAnalysis({ onCreateResume }: Props) {
   const [savedIds, setSavedIds] = useState<number[]>([2]);
   const [query, setQuery] = useState("");
   const [field, setField] = useState("全部領域");
-  const [workMode, setWorkMode] = useState("全部模式");
   const [minimumFit, setMinimumFit] = useState("不限匹配度");
   const [sort, setSort] = useState("匹配度最高");
   const [, setDetailTab] = useState<"overview" | "match">("overview");
+  const [showRequirementAnalysis, setShowRequirementAnalysis] = useState(false);
+  const [applicationJob, setApplicationJob] = useState<Job | null>(null);
+  const [applicationResumeId, setApplicationResumeId] = useState("");
+  const [applicationQuery, setApplicationQuery] = useState("");
+  const [showApplicationConfirmation, setShowApplicationConfirmation] = useState(false);
+  const [showApplicationSuccess, setShowApplicationSuccess] = useState(false);
   const filteredJobs = useMemo(() => {
     const result = jobs.filter((job) => {
       const textMatch = (job.title + job.company + job.summary).toLowerCase().includes(query.trim().toLowerCase());
       const fitFloor = minimumFit === "70% 以上" ? 70 : minimumFit === "80% 以上" ? 80 : 0;
-      return textMatch && (field === "全部領域" || job.field === field) && (workMode === "全部模式" || job.workMode === workMode) && job.fit >= fitFloor && (sort !== "我的收藏" || savedIds.includes(job.id));
+      return textMatch && (field === "全部領域" || job.field === field) && job.fit >= fitFloor && (sort !== "我的收藏" || savedIds.includes(job.id));
     });
     return [...result].sort((a, b) => sort === "最新發布" ? a.id - b.id : b.fit - a.fit);
-  }, [field, minimumFit, query, savedIds, sort, workMode]);
+  }, [field, minimumFit, query, savedIds, sort]);
   const current = jobs.find((job) => job.id === selectedId);
+  const filteredResumeChoices = resumeChoices.filter((resume) => `${resume.title} ${resume.company} ${resume.template}`.toLowerCase().includes(applicationQuery.trim().toLowerCase()));
+  const applicationResume = resumeChoices.find((resume) => resume.id === applicationResumeId);
   function toggleSaved(id: number) { setSavedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]); }
+  function openApplication(job: Job) {
+    setApplicationJob(job);
+    setApplicationResumeId("");
+    setApplicationQuery("");
+    setShowApplicationConfirmation(false);
+    setShowApplicationSuccess(false);
+  }
+  function closeApplication() {
+    setApplicationJob(null);
+    setApplicationResumeId("");
+    setApplicationQuery("");
+    setShowApplicationConfirmation(false);
+    setShowApplicationSuccess(false);
+  }
+  useEffect(() => {
+    if (!showRequirementAnalysis && !applicationJob) return;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showRequirementAnalysis, applicationJob]);
+
+  function renderApplicationDialog() {
+    if (!applicationJob) return null;
+    return <div className="resume-application-overlay">
+      <section className={`resume-application-modal${showApplicationConfirmation || showApplicationSuccess ? " confirmation" : ""}`} role="dialog" aria-modal="true" aria-labelledby="resume-application-title">
+        <header><div><h2 id="resume-application-title">{showApplicationSuccess ? "已投遞履歷" : showApplicationConfirmation ? "確認投遞" : "我的履歷"}</h2>{!showApplicationConfirmation && !showApplicationSuccess && <p>{applicationJob.company} · {applicationJob.title}</p>}</div><button aria-label="關閉投遞視窗" onClick={closeApplication}>×</button></header>
+        {showApplicationSuccess && applicationResume ? <>
+          <main className="resume-application-confirmation" role="status"><span aria-hidden="true">✓</span><p>已成功投遞<strong>【{applicationResume.title}】</strong>至<strong>【{applicationJob.company}、{applicationJob.title}】</strong>。</p></main>
+          <footer><button className="primary" onClick={closeApplication}>完成</button></footer>
+        </> : showApplicationConfirmation && applicationResume ? <>
+          <main className="resume-application-confirmation"><span aria-hidden="true">✓</span><p>確定要投遞<strong>【{applicationResume.title}】</strong>至<strong>【{applicationJob.company}、{applicationJob.title}】</strong>？</p></main>
+          <footer><button onClick={() => setShowApplicationConfirmation(false)}>取消</button><button className="primary" onClick={() => setShowApplicationSuccess(true)}>確認</button></footer>
+        </> : <>
+          <main className="resume-application-picker"><label className="resume-application-search" aria-label="搜尋履歷"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input value={applicationQuery} onChange={(event) => setApplicationQuery(event.target.value)} placeholder="搜尋履歷標題或內容關鍵字" /></label><div className="resume-application-list">{filteredResumeChoices.length ? filteredResumeChoices.map((resume) => <button type="button" className={applicationResumeId === resume.id ? "selected" : ""} aria-pressed={applicationResumeId === resume.id} key={resume.id} onClick={() => setApplicationResumeId(resume.id)}><span className={`resume-application-thumbnail ${resume.color}`}><i /><i /><i /></span><span><strong>{resume.title}</strong><small>{resume.company}</small><small>{resume.template} · 更新於 {resume.updated}</small></span><b>{applicationResumeId === resume.id ? "✓" : "○"}</b></button>) : <p className="resume-application-empty">找不到符合關鍵字的履歷。</p>}</div></main>
+          <footer><button onClick={closeApplication}>取消</button><button className="primary" disabled={!applicationResumeId} onClick={() => setShowApplicationConfirmation(true)}>投遞</button></footer>
+        </>}
+      </section>
+    </div>;
+  }
 
   if (current) {
-    const matchCount = current.requirements.filter((item) => item.status === "match").length;
     return <section className="job-explorer-page page-enter">
-      <button className="job-back-button" onClick={() => setSelectedId(null)}>← 返回職缺探索</button>
+      <div className="job-detail-nav"><button className="job-back-button" onClick={() => setSelectedId(null)}>← 返回職缺探索</button><button className={`job-detail-save-button${savedIds.includes(current.id) ? " saved" : ""}`} aria-label={savedIds.includes(current.id) ? "取消收藏職缺" : "收藏職缺"} onClick={() => toggleSaved(current.id)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S4 16 2.5 10.8C1.4 7 3.8 4 7.1 4c2.1 0 3.9 1.2 4.9 2.9C13 5.2 14.8 4 16.9 4c3.3 0 5.7 3 4.6 6.8C20 16 12 20.5 12 20.5Z" /></svg><span>{savedIds.includes(current.id) ? "已收藏" : "收藏職缺"}</span></button></div>
       <article className="explore-job-detail">
-        <header className="explore-detail-heading"><span className="company-logo">{current.company.slice(0, 1)}</span><div><small>{current.company} · 公司刊登</small><h1>{current.title}</h1><p>{current.location} · {current.workMode} · {current.employment}　{current.salary}</p></div><button className={savedIds.includes(current.id) ? "saved" : ""} onClick={() => toggleSaved(current.id)}>{savedIds.includes(current.id) ? "♥ 已收藏" : "♡ 收藏"}</button></header>
+        <header className="explore-detail-heading"><span className="company-logo">{current.company.slice(0, 1)}</span><div><small>{current.company}</small><h1>{current.title}</h1><p>{current.location} · {current.workMode} · {current.employment} · {current.salary}</p></div><div className="detail-heading-actions"><div className="detail-primary-actions"><button className="primary-flow-button" onClick={() => onCreateResume(current.title + " · " + current.company)}>建立履歷</button><button type="button" onClick={() => openApplication(current)}>投遞履歷</button></div></div></header>
         <div className="explore-unified-detail">
-          <aside className="job-match-sidebar">
-            <div className="detail-fit-card"><small>整體匹配度</small><strong>{current.fit}<span>%</span></strong><p>{current.fit >= 80 ? "高度適合，建議優先申請" : current.fit >= 70 ? "多數條件符合，值得準備" : "有相關優勢，需補強部分條件"}</p></div>
-            <section className="job-match-breakdown"><div className="section-heading"><div><span className="page-kicker">REQUIREMENT MATCH</span><h3>條件逐點分析</h3></div><small>{matchCount} 項符合</small></div><p className="match-method-note">僅使用你已記錄的經驗進行比對。</p><div className="requirement-list">{current.requirements.map((item) => <article key={item.name}><span className={`status-symbol ${item.status}`}>{statusCopy[item.status].icon}</span><div className="requirement-copy"><span><strong>{item.name}</strong>{item.required && <em>必要</em>}</span><p>{item.note}</p><button><i>⌁</i>{item.source}</button></div><span className={`requirement-status ${item.status}`}>{statusCopy[item.status].label}</span></article>)}</div></section>
-            <button className="primary-flow-button job-resume-cta" onClick={() => onCreateResume(current.title + " · " + current.company)}>為此職缺撰寫履歷　→</button><small className="job-resume-note">將依此職缺要求挑選與調整經驗</small>
-          </aside>
           <main className="job-description-column">
-            <section><span className="page-kicker">ABOUT THE ROLE</span><h2>職缺介紹</h2><p>{current.summary}</p></section>
+            <section><h2>職缺介紹</h2><p>{current.summary}</p></section>
             <section><h2>工作內容</h2><ul>{current.responsibilities.map((item) => <li key={item}>{item}</li>)}</ul></section>
-            <section><h2>公司條件</h2><ul>{current.requirements.map((item) => <li key={item.name}><strong>{item.name}</strong>{item.required ? "（必要條件）" : "（加分條件）"}</li>)}</ul></section>
+            <section className="company-requirements-section"><div className="company-requirements-heading"><h2>應具備條件</h2><div><span>匹配度 <strong>{current.fit}%</strong></span><button aria-expanded={showRequirementAnalysis} onClick={() => setShowRequirementAnalysis(true)}>查看分析</button></div></div><ul>{current.requirements.map((item) => <li className={item.required ? "required" : ""} key={item.name}>{item.name} {item.required ? "（必要條件）" : "（加分條件）"}</li>)}</ul></section>
           </main>
         </div>
       </article>
+      {showRequirementAnalysis && <div className="job-analysis-overlay"><button className="modal-backdrop-dismiss" aria-label="關閉條件分析" onClick={() => setShowRequirementAnalysis(false)} /><aside className="job-analysis-drawer" role="dialog" aria-modal="true" aria-labelledby="job-analysis-title"><header><div><h2 id="job-analysis-title">條件分析</h2><p>{current.title} · {current.company}</p></div><button aria-label="關閉條件分析" onClick={() => setShowRequirementAnalysis(false)}>×</button></header><div className="job-analysis-drawer-content"><div className="drawer-match-summary"><span>匹配度<strong>{current.fit}%</strong></span><small>{current.fit >= 80 ? "高度符合" : current.fit >= 70 ? "多數符合" : "部分符合"}</small></div><section className="job-match-breakdown"><div className="requirement-list drawer-requirement-list">{current.requirements.map((item) => <article key={item.name}><div className="requirement-copy"><span>{item.required && <em>必要</em>}<strong>{item.name}</strong></span><p><span>經驗分析：</span>{item.note}</p><p className="requirement-source"><span>具體經驗：</span>{item.source}</p></div><div className={`requirement-result ${item.status}`}><span>{statusCopy[item.status].icon}</span><b>{statusCopy[item.status].label}</b></div></article>)}</div></section></div><footer className="job-analysis-drawer-footer"><button className="primary" onClick={() => { setShowRequirementAnalysis(false); onCreateResume(current.title + " · " + current.company); }}>建立履歷</button><button type="button" onClick={() => { setShowRequirementAnalysis(false); openApplication(current); }}>投遞履歷</button></footer></aside></div>}
+      {renderApplicationDialog()}
     </section>;
   }
 
-  return <section className="job-explorer-page page-enter"><header className="page-title-row"><div><span className="page-kicker">JOB DISCOVERY</span><h1>職缺探索</h1><p>找到最適合你的職缺。</p></div></header><div className="job-results-heading"><div><strong><b>{filteredJobs.length}</b> 個職缺</strong></div><div className="job-results-actions"><div className="job-header-controls"><label className="library-search library-header-search job-header-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋職缺、公司或關鍵字" /></label><select className="job-header-field" value={field} onChange={(event) => setField(event.target.value)} aria-label="領域篩選"><option>全部領域</option>{[...new Set(jobs.map((job) => job.field))].map((item) => <option key={item}>{item}</option>)}</select></div><label><select aria-label="排序方式" value={sort} onChange={(event) => setSort(event.target.value)}><option>匹配度最高</option><option>最新發布</option><option>我的收藏</option></select></label></div></div>{filteredJobs.length ? <div className="job-discovery-grid">{filteredJobs.map((job, index) => <article className="job-discovery-card" key={job.id}><header><span className="company-avatar">{job.company.slice(0, 1)}</span><div><small>{job.company} · 公司刊登</small><h2>{job.title}</h2></div><button className={savedIds.includes(job.id) ? "saved" : ""} aria-label={savedIds.includes(job.id) ? "取消收藏" : "收藏職缺"} onClick={() => toggleSaved(job.id)}>{savedIds.includes(job.id) ? "♥" : "♡"}</button></header><div className="job-card-meta"><span>{job.location}</span><span>{job.workMode}</span><span>{job.employment}</span></div><p>{job.summary}</p><footer><div><strong>{job.fit}<span>%</span></strong><em>匹配度</em></div><button onClick={() => { setSelectedId(job.id); setDetailTab("overview"); }}>查看職缺　→</button></footer></article>)}</div> : <div className="job-empty-state"><span>⌕</span><h2>找不到符合條件的職缺</h2><p>試著調整搜尋條件或領域篩選。</p><button onClick={() => { setQuery(""); setField("全部領域"); setWorkMode("全部模式"); setMinimumFit("不限匹配度"); setSort("匹配度最高"); }}>清除所有篩選</button></div>}</section>;
+  return <section className="job-explorer-page page-enter">
+    <header className="page-title-row">
+      <div><span className="page-kicker">JOB DISCOVERY</span><h1>職缺探索</h1><p>找到最適合你的職缺。</p></div>
+    </header>
+    <div className="job-results-heading">
+      <div><strong><b>{filteredJobs.length}</b> 個職缺</strong></div>
+      <div className="job-results-actions">
+        <div className="job-header-controls">
+          <label className="library-search library-header-search job-header-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋職缺、公司或關鍵字" /></label>
+          <select className="job-header-field job-field-filter" value={field} onChange={(event) => setField(event.target.value)} aria-label="領域篩選"><option value="全部領域">全部領域</option>{[...new Set(jobs.map((job) => job.field))].map((item) => <option key={item}>{item}</option>)}</select>
+        </div>
+        <label><select aria-label="排序方式" value={sort} onChange={(event) => setSort(event.target.value)}><option>匹配度最高</option><option>最新發布</option><option>我的收藏</option></select></label>
+      </div>
+    </div>
+    {filteredJobs.length
+      ? <div className="job-discovery-grid">{filteredJobs.map((job) => <article className="job-discovery-card" key={job.id}>
+          <button className="job-card-open" aria-label={`查看 ${job.company} ${job.title}`} onClick={() => { setSelectedId(job.id); setDetailTab("overview"); }} />
+          <header><span className="company-avatar">{job.company.slice(0, 1)}</span><div><small>{job.company}</small><h2>{job.title}</h2></div><button className={savedIds.includes(job.id) ? "saved" : ""} aria-label={savedIds.includes(job.id) ? "取消收藏" : "收藏職缺"} onClick={() => toggleSaved(job.id)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S4 16 2.5 10.8C1.4 7 3.8 4 7.1 4c2.1 0 3.9 1.2 4.9 2.9C13 5.2 14.8 4 16.9 4c3.3 0 5.7 3 4.6 6.8C20 16 12 20.5 12 20.5Z" /></svg></button></header>
+          <div className="job-card-meta"><span>{job.location}</span><span>{job.workMode}</span><span>{job.employment}</span></div>
+          <p>{job.summary}</p>
+          <footer><div><strong>{job.fit}<span>%</span></strong><em>匹配度</em></div><div className="job-card-actions"><button onClick={() => onCreateResume(job.title + " · " + job.company)}>建立履歷</button><button type="button" onClick={() => openApplication(job)}>投遞履歷</button></div></footer>
+        </article>)}</div>
+      : <div className="job-empty-state"><span>⌕</span><h2>找不到符合條件的職缺</h2><p>試著調整搜尋條件或領域篩選。</p><button onClick={() => { setQuery(""); setField("全部領域"); setMinimumFit("不限匹配度"); setSort("匹配度最高"); }}>清除所有篩選</button></div>}
+    {renderApplicationDialog()}
+  </section>;
 }
